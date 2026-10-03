@@ -1,0 +1,1209 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex">
+<meta name="baiduspider" content="noindex, nofollow">
+<style>body{margin:0}[hidden]{display:none!important}</style>
+<title>Ski IQ 算法主链路</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,500..800&family=JetBrains+Mono:wght@400;600&family=Noto+Sans+SC:wght@400;500;700;900&display=swap">
+<style>
+/* Layout: one full-viewport slide at a time, telemetry traces on a snow-blue ground.
+   Roll is always orange, Yaw always blue, Pitch grey, on every slide. */
+:root{
+  --bg:#EDF1F4; --panel:#F8FAFB; --ink:#13202B; --ink2:#485664; --ink3:#77838F;
+  --line:#CBD4DB; --grid:#DCE3E8; --mute:#B7C1C9;
+  --roll:#DC5526; --roll-ink:#B0421A; --yaw:#1E62C4; --yaw-ink:#1A54A8; --pitch:#7D8995; --ok:#2C7A57;
+  --f-cn:"Noto Sans SC","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  --f-latin:"Archivo","Helvetica Neue",Arial,sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+  --u:min(1vw,1.78vh);
+  --t-hero:clamp(40px,calc(var(--u)*5.6),112px);
+  --t-h2:clamp(24px,calc(var(--u)*2.55),52px);
+  --t-h3:clamp(16px,calc(var(--u)*1.3),27px);
+  --t-body:clamp(14px,calc(var(--u)*1.05),21px);
+  --t-small:clamp(11.5px,calc(var(--u)*.82),16px);
+  --gx:clamp(16px,4.6vw,92px);
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0E161E; --panel:#15202A; --ink:#E4EBF0; --ink2:#A3B1BC; --ink3:#73828F;
+  --line:#2A3845; --grid:#1E2A35; --mute:#38464F;
+  --roll:#FF7B47; --roll-ink:#FF9466; --yaw:#5B9CFF; --yaw-ink:#80B3FF; --pitch:#8E9BA7; --ok:#4DB385; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0E161E; --panel:#15202A; --ink:#E4EBF0; --ink2:#A3B1BC; --ink3:#73828F;
+  --line:#2A3845; --grid:#1E2A35; --mute:#38464F;
+  --roll:#FF7B47; --roll-ink:#FF9466; --yaw:#5B9CFF; --yaw-ink:#80B3FF; --pitch:#8E9BA7; --ok:#4DB385; color-scheme:dark}
+
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-cn);font-size:var(--t-body);line-height:1.6;overflow:hidden;-webkit-font-smoothing:antialiased}
+h1,h2,h3,p,ul,ol{margin:0}
+ul{padding:0;list-style:none}
+button{font:inherit;color:inherit}
+
+#deck{position:relative;height:100%}
+.slide{position:absolute;inset:0;display:flex;flex-direction:column;gap:clamp(12px,2.2vh,30px);
+  padding:clamp(18px,4.4vh,56px) var(--gx) clamp(70px,10.5vh,112px);
+  opacity:0;visibility:hidden;transition:opacity .45s ease,visibility 0s linear .45s;overflow:hidden}
+.slide.active{opacity:1;visibility:visible;transition:opacity .45s ease}
+.note{display:none}
+
+.head{display:flex;flex-direction:column;gap:clamp(4px,.8vh,10px);max-width:70rem}
+.eyebrow{font-family:var(--f-latin);font-stretch:112%;font-weight:600;font-size:var(--t-small);letter-spacing:.14em;text-transform:uppercase;color:var(--ink3);display:flex;gap:.8em;align-items:baseline}
+.eyebrow b{color:var(--ink);font-weight:800}
+h2{font-weight:800;font-size:var(--t-h2);line-height:1.15;letter-spacing:-.01em;text-wrap:balance}
+h3{font-weight:700;font-size:var(--t-h3);line-height:1.3}
+.lead{color:var(--ink2);max-width:44em}
+.small{font-size:var(--t-small);color:var(--ink3)}
+.mono{font-family:var(--f-mono)}
+.r{color:var(--roll-ink)} .y{color:var(--yaw-ink)} .p{color:var(--pitch)}
+.body{flex:1;min-height:0;display:grid;gap:clamp(14px,2.6vw,48px)}
+.two{grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr)}
+.two-r{grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr)}
+.col{display:flex;flex-direction:column;gap:clamp(10px,1.8vh,22px);min-width:0;min-height:0}
+.stage{position:relative;min-height:150px;min-width:0}
+.stage canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.plot{background:var(--panel);border:1px solid var(--line);border-radius:10px}
+.tag{font-size:var(--t-small);color:var(--ink3)}
+.keys{display:flex;flex-wrap:wrap;gap:.4em 1.4em;font-size:var(--t-small);color:var(--ink2);align-items:center}
+.keys i{display:inline-block;width:22px;height:3px;border-radius:2px;vertical-align:middle;margin-right:.5em}
+.keys .kr i{background:var(--roll)} .keys .ky i{background:var(--yaw)} .keys .kp i{background:var(--pitch)}
+.btn{font-size:var(--t-small);font-weight:500;border:1px solid var(--line);background:var(--panel);padding:.42em 1em;border-radius:999px;cursor:pointer;line-height:1.3}
+.btn:hover{border-color:var(--ink3)}
+.btn[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+:focus-visible{outline:2px solid var(--yaw);outline-offset:2px}
+
+/* builds */
+.b{opacity:0;transform:translateY(10px);transition:opacity .5s ease,transform .5s ease}
+.b.on{opacity:1;transform:none}
+svg .b{transform:none}
+
+/* steps list (left rail that tracks the build) */
+.steps{display:flex;flex-direction:column;gap:clamp(10px,1.8vh,20px)}
+.steps li{display:grid;grid-template-columns:2.2em minmax(0,1fr);gap:.6em;align-items:start}
+.steps .n{font-family:var(--f-latin);font-weight:800;font-stretch:118%;color:var(--ink3);font-size:var(--t-h3);line-height:1.2}
+.steps li.on .n{color:var(--roll-ink)}
+.steps h3{font-size:var(--t-body);font-weight:700;line-height:1.4}
+.steps p{font-size:var(--t-small);color:var(--ink2);line-height:1.6}
+
+/* ---------- cover ---------- */
+.cover-grid{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);gap:clamp(20px,4vw,72px);align-items:stretch}
+.cover-text{display:flex;flex-direction:column;justify-content:center;gap:clamp(14px,2.6vh,30px)}
+.hero{font-weight:900;font-size:var(--t-hero);line-height:1.02;letter-spacing:-.025em}
+.hero em{font-style:normal;color:var(--roll-ink)}
+.cover-stage{border-radius:14px;background:var(--panel);border:1px solid var(--line);overflow:hidden}
+.trio{display:flex;flex-wrap:wrap;gap:.6em}
+.trio span{font-family:var(--f-latin);font-stretch:110%;font-weight:700;font-size:var(--t-small);padding:.3em .8em;border-radius:6px;border:1.5px solid currentColor;letter-spacing:.04em}
+.hint{font-size:var(--t-small);color:var(--ink3)}
+.hint kbd{font-family:var(--f-mono);font-size:.92em;border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 .35em;background:var(--panel);color:var(--ink2)}
+
+/* ---------- sensors ---------- */
+.board-svg{width:100%;height:auto;max-height:46vh}
+.board-svg .outline{fill:var(--panel);stroke:var(--ink);stroke-width:2.5}
+.board-svg .bplate{fill:none;stroke:var(--ink3);stroke-width:1.6}
+.board-svg .hb{fill:none;stroke:var(--ink2);stroke-width:7;stroke-linecap:round}
+.board-svg .boot{fill:var(--bg);stroke:var(--ink);stroke-width:2.2;stroke-linejoin:round}
+.board-svg .cuff{fill:var(--grid);stroke:var(--ink);stroke-width:2}
+.board-svg .lace{stroke:var(--ink3);stroke-width:2;stroke-linecap:round}
+.board-svg .strap{fill:var(--ink2)}
+.board-svg .dev{fill:var(--ink)}
+.board-svg .jaw{fill:none;stroke:var(--ink);stroke-width:3.4;stroke-linecap:round;stroke-linejoin:round}
+.board-svg .led{fill:var(--ok);opacity:.3;transition:opacity .12s}
+.board-svg .led.hot{opacity:1}
+.board-svg .lead{stroke:var(--ink3);stroke-width:1.2;fill:none}
+.board-svg .pulse{fill:none;stroke:var(--ink2);stroke-width:1.5;transform-box:fill-box;transform-origin:center;animation:pulse 2.2s ease-out 1.6s infinite both}
+.board-svg .pulse.d2{animation-delay:2.7s}
+.board-svg .click{fill:none;stroke:var(--ok);stroke-width:2;transform-box:fill-box;transform-origin:center;opacity:0}
+.board-svg text{fill:var(--ink2);font-family:var(--f-cn);font-size:17px;font-weight:600}
+.board-svg .faint{fill:var(--ink3);font-size:14px;font-weight:500}
+.go .sns.l{animation:clipIn .65s cubic-bezier(.2,.9,.3,1.15) .3s both}
+.go .sns.r{animation:clipIn .65s cubic-bezier(.2,.9,.3,1.15) .55s both}
+.go .jaw.l{animation:jawShut .22s ease-in 1s both}
+.go .jaw.r{animation:jawShut .22s ease-in 1.25s both}
+.go .click.l{animation:click .7s ease-out 1.2s both}
+.go .click.r{animation:click .7s ease-out 1.45s both}
+@keyframes clipIn{from{transform:translateX(-46px);opacity:0}to{transform:none;opacity:1}}
+@keyframes jawShut{from{transform:translateX(9px)}to{transform:none}}
+@keyframes click{0%{transform:scale(.6);opacity:1}100%{transform:scale(2.4);opacity:0}}
+@keyframes pulse{0%{transform:scale(1);opacity:.7}100%{transform:scale(3);opacity:0}}
+.ticker{font-family:var(--f-mono);font-size:clamp(10.5px,calc(var(--u)*.74),14px);line-height:1.7;color:var(--ink2);background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:.8em 1em;white-space:pre;overflow:hidden;margin:0}
+.ticker b{color:var(--ink);font-weight:600}
+.spec{display:flex;flex-direction:column}
+.spec li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.3em 1em;padding:clamp(10px,2vh,22px) 0;border-top:1px solid var(--line)}
+.spec li:last-child{border-bottom:1px solid var(--line)}
+.spec h3{grid-column:1}
+.spec .rate{grid-column:2;grid-row:1;font-family:var(--f-mono);font-size:var(--t-small);color:var(--ink2);align-self:center;white-space:nowrap}
+.spec p{grid-column:1 / -1;color:var(--ink2);font-size:var(--t-small);line-height:1.65}
+
+/* ---------- journey ---------- */
+.flow-svg{width:100%;height:auto}
+.flow-svg .node{fill:var(--panel);stroke:var(--line);stroke-width:1.5}
+.flow-svg .node.hot{stroke:var(--ink);stroke-width:2}
+.flow-svg .t1{fill:var(--ink);font-family:var(--f-cn);font-size:22px;font-weight:700}
+.flow-svg .t2{fill:var(--ink2);font-family:var(--f-cn);font-size:15px}
+.flow-svg .lk{stroke:var(--line);stroke-width:2;fill:none}
+.flow-svg .lkl{fill:var(--ink3);font-family:var(--f-cn);font-size:15px}
+.flow-svg .pk{fill:var(--ink)}
+.flow-svg .pk.res{fill:var(--roll)}
+.trig-svg{width:100%;height:auto}
+.trig-svg .alt{fill:none;stroke:var(--ink);stroke-width:2.5}
+.trig-svg .base{stroke:var(--grid);stroke-width:1}
+.trig-svg text{font-family:var(--f-cn);font-size:15px;fill:var(--ink2)}
+.trig-svg .fire{opacity:.25;transition:opacity .3s}
+.trig-svg .fire.on{opacity:1}
+.trig-svg .fire circle{fill:var(--roll)}
+.trig-svg .fire text{fill:var(--roll-ink);font-weight:700}
+.trig-svg .dotm{fill:var(--roll)}
+.facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:clamp(12px,2vw,36px)}
+.facts > div{border-top:2px solid var(--ink);padding-top:.7em;display:flex;flex-direction:column;gap:.3em}
+.facts p{font-size:var(--t-small);color:var(--ink2)}
+
+/* ---------- euler 3D ---------- */
+.euler-stage{border-radius:12px;background:var(--panel);border:1px solid var(--line);overflow:hidden}
+.euler-stage canvas{position:absolute;inset:0;width:100%!important;height:100%!important}
+.fallback{position:absolute;inset:0;display:grid;place-items:center;padding:2em;text-align:center;color:var(--ink2)}
+.axes{display:flex;flex-direction:column;gap:clamp(8px,1.4vh,16px)}
+.axcard{border:1px solid var(--line);border-left-width:4px;border-radius:8px;padding:clamp(10px,1.6vh,18px) clamp(12px,1.2vw,20px);background:var(--panel);display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.2em 1em;transition:border-color .3s,box-shadow .3s}
+.axcard.ar{border-left-color:var(--roll)} .axcard.ap{border-left-color:var(--pitch)} .axcard.ay{border-left-color:var(--yaw)}
+.axcard.hot{box-shadow:0 0 0 2px var(--line)}
+.axcard.ar.hot{border-color:var(--roll)} .axcard.ap.hot{border-color:var(--pitch)} .axcard.ay.hot{border-color:var(--yaw)}
+.axcard h3 span{font-family:var(--f-latin);font-stretch:110%;font-weight:800;margin-right:.4em}
+.axcard .val{font-family:var(--f-mono);font-size:var(--t-h3);font-weight:600;align-self:center;font-variant-numeric:tabular-nums;min-width:4.2ch;text-align:right}
+.axcard p{grid-column:1 / -1;font-size:var(--t-small);color:var(--ink2);line-height:1.6}
+.axcard input{grid-column:1 / -1;width:100%;accent-color:var(--ink)}
+.ctrls{display:flex;flex-wrap:wrap;gap:.5em}
+
+/* ---------- sync ---------- */
+.sync{grid-template-columns:minmax(0,.62fr) minmax(0,1.38fr)}
+.sync-top{border-radius:12px;background:var(--panel);border:1px solid var(--line);overflow:hidden}
+.chart-col{display:flex;flex-direction:column;gap:.6em;min-width:0;min-height:0}
+.chart-col .stage{flex:1}
+.chart-bar{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:.6em}
+
+/* ---------- patterns ---------- */
+.pats{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(2,minmax(0,1fr))}
+.pat{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:clamp(10px,1.4vw,24px);min-height:0;align-items:stretch}
+.pat .stage{min-height:110px}
+.pat .txt{display:flex;flex-direction:column;justify-content:center;gap:.35em;min-width:0}
+.pat .txt p{font-size:var(--t-small);color:var(--ink2);line-height:1.6}
+
+/* ---------- hierarchy svg ---------- */
+.hier{width:100%;height:100%;max-height:100%}
+.hier .base{fill:var(--grid)}
+.hier .run{fill:var(--roll);opacity:.28} .hier .run.hot{opacity:.85}
+.hier .seg{fill:var(--yaw);opacity:.25} .hier .seg.hot{opacity:.8}
+.hier .blk{fill:var(--ink2);opacity:.25} .hier .blk.hot{opacity:.75}
+.hier .cell{fill:var(--panel);stroke:var(--ink3);stroke-width:1.2} .hier .cell.hot{fill:var(--ink);stroke:var(--ink)}
+.hier .ph{stroke:var(--panel);stroke-width:3}
+.hier .ph1{fill:var(--yaw);opacity:.5} .hier .ph2{fill:var(--roll);opacity:.75} .hier .ph3{fill:var(--yaw);opacity:.5}
+.hier .fun{fill:var(--ink);opacity:.06}
+.hier .hatch{fill:url(#hatch)}
+.hier .hatch-l{stroke:var(--ink3);stroke-width:1.4}
+.hier .nm{fill:var(--ink);font-family:var(--f-cn);font-size:19px;font-weight:800}
+.hier .ds{fill:var(--ink2);font-family:var(--f-cn);font-size:13.5px}
+.hier .in{fill:var(--ink);font-family:var(--f-cn);font-size:14px;font-weight:600}
+.hier .inw{fill:var(--bg);font-family:var(--f-cn);font-size:14px;font-weight:700}
+.hier .tk{stroke:var(--ink);stroke-width:1;opacity:.35}
+
+/* ---------- framework ---------- */
+.frame{flex:1;min-height:0;max-height:46vh;display:grid;grid-template-columns:minmax(0,1fr) clamp(36px,4vw,72px) minmax(0,1fr) clamp(36px,4vw,72px) minmax(0,1fr);align-items:stretch}
+.fw{display:flex;flex-direction:column;gap:clamp(6px,1.2vh,14px);text-align:left;background:var(--panel);border:1.5px solid var(--line);border-radius:14px;padding:clamp(16px,2.2vw,34px);cursor:pointer;transition:border-color .4s}
+.fw:hover{border-color:var(--ink3)}
+.fw.on{border-color:var(--roll)}
+.fw-t{font-weight:900;font-size:var(--t-h2);line-height:1.1}
+.fw-q{font-weight:700;font-size:var(--t-h3);color:var(--roll-ink)}
+.fw p{color:var(--ink2)}
+.fw .chain{margin-top:auto;font-size:var(--t-small);color:var(--ink3);border-top:1px solid var(--line);padding-top:.7em}
+.fw-arrow{align-self:center;height:3px;position:relative;margin-right:10px;background:repeating-linear-gradient(90deg,var(--ink3) 0 6px,transparent 6px 12px);background-size:12px 3px;animation:dashx .8s linear infinite}
+.fw-arrow::after{content:"";position:absolute;right:-10px;top:-5px;border-left:10px solid var(--ink3);border-top:6.5px solid transparent;border-bottom:6.5px solid transparent}
+@keyframes dashx{to{background-position:12px 0}}
+.lang{display:flex;flex-direction:column;gap:.8em;text-align:left;background:none;border:0;padding:0;cursor:pointer}
+.lang .tri{display:flex;height:4px;border-radius:2px;overflow:hidden}
+.lang .tri i{flex:1}
+.lang .tri i:nth-child(1){background:var(--roll)} .lang .tri i:nth-child(2){background:var(--pitch)} .lang .tri i:nth-child(3){background:var(--yaw)}
+.lang .lt{display:flex;flex-wrap:wrap;gap:.3em 1.2em;align-items:baseline}
+.lang b{font-size:var(--t-h3);font-weight:800}
+.lang span{color:var(--ink2)}
+
+/* ---------- pyramid ---------- */
+.pyr-wrap{grid-template-columns:minmax(0,1.75fr) minmax(0,1fr);align-items:center}
+.pyr{position:relative;display:flex;flex-direction:column;align-items:center;gap:clamp(28px,6vh,64px);padding-left:clamp(40px,4vw,70px)}
+.pyr-ax{position:absolute;left:0;top:0;bottom:0;display:flex;flex-direction:column;align-items:center;gap:.4em;font-size:var(--t-small);color:var(--ink3);font-weight:700}
+.pyr-ax i{flex:1;width:2px;background:linear-gradient(var(--ink2),var(--line));position:relative}
+.pyr-ax i::before{content:"";position:absolute;top:-2px;left:50%;transform:translateX(-50%);border-bottom:9px solid var(--ink2);border-left:6px solid transparent;border-right:6px solid transparent}
+.lvl{position:relative;border-radius:14px;padding:clamp(16px,3vh,34px) clamp(16px,2vw,36px);display:flex;flex-direction:column;gap:.6em;background:var(--panel);border:1px solid var(--line)}
+.lvl.l1{width:100%} .lvl.l2{width:82%} .lvl.l3{width:58%;background:var(--ink);border-color:var(--ink)}
+.lv-h{display:flex;flex-wrap:wrap;align-items:baseline;gap:.3em 1em}
+.lv-k{font-weight:900;font-size:clamp(18px,calc(var(--u)*1.75),36px)}
+.l3 .lv-k{font-family:var(--f-latin);font-stretch:115%;font-size:clamp(30px,calc(var(--u)*3.4),68px);color:var(--bg);line-height:1}
+.lv-s{font-size:var(--t-body);color:var(--ink3);font-weight:600}
+.l3 .lv-s{color:var(--bg);opacity:.75}
+.lvl p{font-size:var(--t-body);color:var(--ink2);line-height:1.6}
+.l3 p{color:var(--bg);opacity:.85}
+.lvl.l2::after,.lvl.l3::after{content:"";position:absolute;left:50%;top:100%;width:3px;height:clamp(28px,6vh,64px);transform:translateX(-50%);background:repeating-linear-gradient(0deg,var(--roll) 0 5px,transparent 5px 11px);background-size:3px 11px;animation:rise .7s linear infinite}
+@keyframes rise{to{background-position:0 -11px}}
+.chips{display:flex;flex-wrap:wrap;gap:.45em}
+.chips span{font-size:var(--t-body);padding:.25em .7em;border-radius:6px;background:var(--bg);border:1px solid var(--line);white-space:nowrap}
+.pyr-side{display:flex;flex-direction:column;gap:clamp(16px,3.2vh,34px)}
+.side{border-top:2px solid var(--ink);padding-top:.7em;display:flex;flex-direction:column;gap:.3em}
+.side p{font-size:var(--t-body);color:var(--ink2)}
+
+/* ---------- textbook tie-ins ---------- */
+.tm{font-family:var(--f-latin);font-stretch:108%;font-weight:700;font-size:var(--t-small);color:var(--ink3);letter-spacing:.03em;margin-left:.35em;white-space:nowrap}
+.src{font-size:var(--t-small);color:var(--ink3);line-height:1.6}
+.eps{grid-template-columns:repeat(3,minmax(0,1fr));align-content:center}
+.eps-c{display:flex;flex-direction:column;gap:.55em;border-top:3px solid var(--ink);padding-top:1em;min-width:0}
+.eps-c.er{border-color:var(--roll)} .eps-c.ep{border-color:var(--ink2)} .eps-c.ey{border-color:var(--yaw)}
+.eps-viz{width:100%;height:clamp(110px,21vh,230px);background:var(--panel);border:1px solid var(--line);border-radius:10px}
+.eps-en{font-family:var(--f-latin);font-stretch:115%;font-weight:800;letter-spacing:.08em;font-size:var(--t-small);color:var(--ink3)}
+.eps-c h3{font-size:var(--t-h2);font-weight:900;line-height:1.1}
+.eps-c p{color:var(--ink2)}
+.eps-c .see{color:var(--ink);font-weight:700}
+.ev-snow{stroke:var(--ink3);stroke-width:1.5}
+.ev-lbl{font-family:var(--f-latin);font-weight:800;font-size:15px}
+.ev-tilt{transform-box:view-box;transform-origin:100px 84px;animation:evtilt 3.2s ease-in-out infinite}
+@keyframes evtilt{0%,100%{transform:rotate(-26deg)}50%{transform:rotate(26deg)}}
+.ev-bend{transform-box:view-box;transform-origin:100px 66px;animation:evbend 2.4s ease-in-out infinite}
+@keyframes evbend{0%,100%{transform:scaleY(.06)}50%{transform:scaleY(1)}}
+.ev-yaw{transform-box:view-box;transform-origin:100px 62px;animation:evyaw 3.2s ease-in-out infinite}
+@keyframes evyaw{0%,100%{transform:rotate(-38deg)}50%{transform:rotate(38deg)}}
+.loop{--lg:clamp(16px,2.2vw,40px);display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:var(--lg);align-content:center}
+.lp{position:relative;display:flex;flex-direction:column;gap:.6em;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:clamp(14px,1.6vw,26px);min-width:0}
+.lp:not(:last-child)::after{content:"›";position:absolute;top:50%;right:calc(var(--lg) / -2 - .28em);transform:translateY(-50%);font-family:var(--f-latin);font-weight:800;font-size:var(--t-h2);color:var(--ink3)}
+.lp .k{font-family:var(--f-latin);font-stretch:118%;font-weight:800;color:var(--ink3);font-size:var(--t-small);letter-spacing:.1em}
+.lp h3{font-size:var(--t-h3)}
+.lp .q{font-size:var(--t-small);color:var(--ink2);border-left:3px solid var(--line);padding-left:.7em;line-height:1.6}
+.lp .us{font-size:var(--t-small);line-height:1.6}
+.lp .who{align-self:flex-start;margin-top:auto;font-size:var(--t-small);font-weight:700;padding:.2em .7em;border-radius:999px}
+.who.d{background:var(--ink);color:var(--bg)}
+.who.c{border:1.5px solid var(--roll);color:var(--roll-ink)}
+.ret{display:flex;align-items:center;gap:1em;color:var(--ink3);font-size:var(--t-small)}
+.ret i{flex:1;height:2px;background:repeating-linear-gradient(90deg,var(--ink3) 0 6px,transparent 6px 12px);background-size:12px 2px;animation:dashback .8s linear infinite}
+@keyframes dashback{to{background-position:-12px 0}}
+.rtp{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.6em}
+.rtp div{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:.45em .8em;display:flex;flex-direction:column;gap:.1em;min-width:0}
+.rtp b{font-weight:800}
+.rtp span{font-size:var(--t-small);color:var(--ink2)}
+.dim .src{border-left:3px solid var(--line);padding-left:.7em}
+
+/* ---------- dims ---------- */
+.dims{grid-template-columns:repeat(4,minmax(0,1fr))}
+.dim{border-top:3px solid var(--ink);padding-top:clamp(10px,1.6vh,18px);display:flex;flex-direction:column;gap:clamp(8px,1.4vh,16px);min-width:0}
+.dim .en{font-family:var(--f-latin);font-stretch:118%;font-weight:800;font-size:var(--t-h3);line-height:1.1}
+.dim .q{color:var(--ink2);font-size:var(--t-small)}
+.dim li{display:flex;flex-direction:column;gap:.15em;padding:.6em 0;border-top:1px solid var(--line)}
+.dim li b{font-weight:700;font-size:var(--t-body)}
+.dim li span{font-size:var(--t-small);color:var(--ink2);line-height:1.55}
+.foot{font-size:var(--t-small);color:var(--ink2);border-left:3px solid var(--line);padding-left:1em;max-width:62em}
+
+/* ---------- issues ---------- */
+.iss{grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:repeat(2,minmax(0,1fr))}
+.icard{border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:clamp(10px,1.4vw,18px);display:flex;flex-direction:column;gap:.4em;min-width:0;min-height:0}
+.icard .stage{flex:1;min-height:60px}
+.icard p{font-size:var(--t-small);color:var(--ink2);line-height:1.55}
+.logic{display:flex;flex-wrap:wrap;align-items:center;gap:.6em 1em}
+.logic .stp{padding:.45em 1em;border:1.5px solid var(--ink);border-radius:999px;font-weight:700;font-size:var(--t-small)}
+.logic .arw{color:var(--ink3);font-family:var(--f-latin);font-weight:800}
+.logic .nt{font-size:var(--t-small);color:var(--ink2);flex-basis:100%}
+
+/* ---------- recap ---------- */
+.recap{display:flex;flex-direction:column;justify-content:center;gap:clamp(16px,3.4vh,40px)}
+.lane{display:grid;grid-template-columns:clamp(70px,9vw,150px) minmax(0,1fr);gap:1em;align-items:center}
+.lane .ln{font-family:var(--f-latin);font-stretch:118%;font-weight:800;color:var(--ink3);font-size:var(--t-small);letter-spacing:.08em}
+.lane .ln b{display:block;font-family:var(--f-cn);color:var(--ink);font-size:var(--t-body);letter-spacing:0}
+.nodes{display:flex;flex-wrap:wrap;gap:.5em;align-items:center}
+.nodes span{padding:.45em .95em;border-radius:8px;border:1.5px solid var(--line);background:var(--panel);font-weight:600;font-size:var(--t-small);transition:all .3s}
+.nodes span.on{border-color:var(--roll);background:var(--roll);color:var(--bg)}
+.nodes i{font-style:normal;color:var(--ink3);font-family:var(--f-latin);font-weight:800}
+.qa{font-family:var(--f-latin);font-stretch:125%;font-weight:800;font-size:var(--t-hero);line-height:1;letter-spacing:-.02em}
+
+/* ---------- chrome ---------- */
+.bar{position:fixed;left:0;right:0;bottom:0;z-index:5;display:flex;align-items:center;gap:clamp(8px,1.4vw,20px);
+  padding:10px var(--gx) calc(12px + env(safe-area-inset-bottom,0px));background:color-mix(in srgb,var(--bg) 90%,transparent);backdrop-filter:blur(6px)}
+.bar .where{font-size:var(--t-small);color:var(--ink2);white-space:nowrap;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.bar .where b{font-family:var(--f-mono);color:var(--ink);font-weight:600;margin-right:.6em}
+.prog{flex:1;display:flex;gap:3px;align-items:center;min-width:60px}
+.prog button{flex:1;height:14px;border:0;background:none;padding:5px 0;cursor:pointer;display:flex;align-items:center}
+.prog button::before{content:"";display:block;width:100%;height:3px;border-radius:2px;background:var(--line);transition:background .3s}
+.prog button.done::before{background:var(--ink3)}
+.prog button.cur::before{background:var(--roll);height:4px}
+.prog button.gap{margin-left:7px}
+.nav{display:flex;gap:6px}
+.nav .btn{padding:.38em .8em}
+.notes{position:fixed;right:var(--gx);bottom:calc(64px + env(safe-area-inset-bottom,0px));z-index:6;width:min(36rem,calc(100% - 32px));max-height:42vh;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:1em 1.2em;font-size:var(--t-body);color:var(--ink);box-shadow:0 10px 30px rgba(0,0,0,.12)}
+.notes h4{margin:0 0 .4em;font-size:var(--t-small);color:var(--ink3);font-weight:600;letter-spacing:.06em}
+.notes p{margin:0 0 .5em}
+
+@media (max-width:860px){
+  .slide{overflow-y:auto;padding-bottom:96px}
+  .body{flex:none}
+  .two,.two-r,.cover-grid,.sync,.dims,.pyr-wrap{grid-template-columns:minmax(0,1fr)}
+  .pats,.iss{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:none}
+  .facts{grid-template-columns:minmax(0,1fr)}
+  .frame{grid-template-columns:minmax(0,1fr);max-height:none;gap:12px;flex:none}
+  .fw-arrow{display:none}
+  .stage{height:62vw;min-height:200px}
+  .cover-stage{height:70vw}
+  .pat{grid-template-columns:minmax(0,1fr)}
+  .pat .stage,.icard .stage{height:34vw;min-height:110px}
+  .lvl.l2,.lvl.l3{width:100%}
+  .eps,.loop,.rtp{grid-template-columns:minmax(0,1fr)}
+  .lp:not(:last-child)::after{display:none}
+  .hier{height:auto}
+  .bar .where{display:none}
+}
+@media (max-width:520px){
+  .pats,.iss{grid-template-columns:minmax(0,1fr)}
+}
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important}
+}
+</style>
+
+</head>
+<body>
+<main id="deck">
+
+<!-- 1 · cover -->
+<section class="slide" data-ctl="cover" data-sec="开场">
+  <div class="cover-grid">
+    <div class="cover-text">
+      <p class="eyebrow">算法分享 · AI_SkiMetric 主链路</p>
+      <h1 class="hero">一块板，<br><em>三条线</em></h1>
+      <p class="lead">传感器怎么工作、滑雪怎么被识别、IQ 和各项指标是什么关系。今天讲框架，不讲实现，并对照国际单板教学体系（SBINZ / AASI / CASI）的理念。</p>
+      <div class="trio"><span class="r">Roll 立刃</span><span class="p">Pitch 俯仰</span><span class="y">Yaw 朝向</span></div>
+      <p class="hint"><kbd>←</kbd> <kbd>→</kbd> 翻页 · <kbd>N</kbd> 讲稿 · <kbd>R</kbd> 重播本页动画</p>
+    </div>
+    <div class="stage cover-stage" role="img" aria-label="雪板沿 S 形路线下滑，下方实时画出 Roll 和 Yaw 曲线"></div>
+  </div>
+  <aside class="note"><p>开场：今天把整条算法链路从头走一遍。一块板上的“三条线”就是 Roll、Pitch、Yaw，后面所有识别和打分都是从这三条线（加上加速度和气压）里读出来的。</p><p>右边的动画先不解释，看完第二章大家就能自己读懂它。</p></aside>
+</section>
+
+<!-- 2 · framework -->
+<section class="slide" data-ctl="frame" data-sec="开场">
+  <div class="head"><p class="eyebrow">整体框架</p><h2>三步：采集、识别、评价</h2></div>
+  <div class="frame">
+    <button class="fw" data-go="3"><span class="fw-t">采集</span><span class="fw-q">感知动作</span><p>两只脚上的传感器加一部手机，记录动作、高度和位置。</p><span class="chain">传感器 › 手机 › 云端</span></button>
+    <span class="fw-arrow" aria-hidden="true"></span>
+    <button class="fw" data-go="9"><span class="fw-t">识别</span><span class="fw-q">理解在做什么</span><p>把一整天拆开：先找出在滑雪的时间，再一层层拆到每一个弯。</p><span class="chain">一天 › 一趟 › 一段 › 一组弯 › 一个弯</span></button>
+    <span class="fw-arrow" aria-hidden="true"></span>
+    <button class="fw" data-go="11"><span class="fw-t">评价</span><span class="fw-q">滑得怎么样</span><p>每个弯算技术指标，汇总成进阶指标和 IQ，再找出主要问题。</p><span class="chain">技术指标 › 进阶指标 › IQ</span></button>
+  </div>
+  <button class="lang" data-go="5"><span class="tri" aria-hidden="true"><i></i><i></i><i></i></span><span class="lt"><b>贯穿始终的语言：欧拉角</b><span><span class="r">Roll</span> / <span class="p">Pitch</span> / <span class="y">Yaw</span> 三条线，对应教材里雪板的用刃、前后压力和转向。识别和评价的每一步都能在这三条线上看到，所以先教大家读图。</span></span></button>
+  <aside class="note"><p>今天不讲代码，只讲框架。整套系统就是三步：采集动作、识别动作、评价动作。</p><p>下面那条“欧拉角”是看懂这一切的语言，放在第二部分教。点任意一块可以直接跳过去。</p></aside>
+</section>
+
+<!-- 3 · sensors -->
+<section class="slide" data-ctl="sensors" data-sec="01 采集" data-steps="2">
+  <div class="head"><p class="eyebrow"><b>01</b> 采集 · 传感器</p><h2>两只雪鞋外侧各一个传感器，手机补一路 GPS</h2></div>
+  <div class="body two">
+    <div class="col" style="justify-content:center">
+      <svg class="board-svg" viewBox="0 0 640 300" role="img" aria-label="从上往下看：雪板上两只雪鞋，传感器分别夹在左右雪鞋的外侧">
+        <text class="faint" x="320" y="76" text-anchor="middle">脚尖一侧</text>
+        <path class="outline" d="M110,92 Q320,103 530,92 Q602,92 602,150 Q602,208 530,208 Q320,197 110,208 Q38,208 38,150 Q38,92 110,92 Z"/>
+        <g transform="translate(232,150) rotate(-15)">
+          <rect class="bplate" x="-32" y="-52" width="64" height="112" rx="15"/>
+          <path class="hb" d="M-29,50 Q0,76 29,50"/>
+          <path class="boot" d="M0,-58 C16,-58 24,-46 25,-28 L27,10 C28,36 24,58 0,60 C-24,58 -28,36 -27,10 L-25,-28 C-24,-46 -16,-58 0,-58 Z"/>
+          <line class="lace" x1="-7" y1="-32" x2="7" y2="-32"/><line class="lace" x1="-7" y1="-23" x2="7" y2="-23"/><line class="lace" x1="-7" y1="-14" x2="7" y2="-14"/>
+          <ellipse class="cuff" cx="0" cy="24" rx="19" ry="16"/>
+          <rect class="strap" x="-30" y="-48" width="60" height="9" rx="4"/><rect class="strap" x="-31" y="-4" width="62" height="11" rx="5"/>
+          <g class="sns l">
+            <circle class="pulse" cx="-39" cy="24" r="11"/><circle class="pulse d2" cx="-39" cy="24" r="11"/>
+            <rect class="dev" x="-47" y="6" width="15" height="36" rx="4"/>
+            <path class="jaw l" d="M-33,9 H-21 V39 H-33"/>
+            <circle class="led js-led-l" cx="-39.5" cy="14" r="2.8"/>
+            <circle class="click l" cx="-39" cy="24" r="13"/>
+          </g>
+        </g>
+        <g transform="translate(408,150) rotate(15) scale(-1,1)">
+          <rect class="bplate" x="-32" y="-52" width="64" height="112" rx="15"/>
+          <path class="hb" d="M-29,50 Q0,76 29,50"/>
+          <path class="boot" d="M0,-58 C16,-58 24,-46 25,-28 L27,10 C28,36 24,58 0,60 C-24,58 -28,36 -27,10 L-25,-28 C-24,-46 -16,-58 0,-58 Z"/>
+          <line class="lace" x1="-7" y1="-32" x2="7" y2="-32"/><line class="lace" x1="-7" y1="-23" x2="7" y2="-23"/><line class="lace" x1="-7" y1="-14" x2="7" y2="-14"/>
+          <ellipse class="cuff" cx="0" cy="24" rx="19" ry="16"/>
+          <rect class="strap" x="-30" y="-48" width="60" height="9" rx="4"/><rect class="strap" x="-31" y="-4" width="62" height="11" rx="5"/>
+          <g class="sns r">
+            <circle class="pulse" cx="-39" cy="24" r="11"/><circle class="pulse d2" cx="-39" cy="24" r="11"/>
+            <rect class="dev" x="-47" y="6" width="15" height="36" rx="4"/>
+            <path class="jaw r" d="M-33,9 H-21 V39 H-33"/>
+            <circle class="led js-led-r" cx="-39.5" cy="14" r="2.8"/>
+            <circle class="click r" cx="-39" cy="24" r="13"/>
+          </g>
+        </g>
+        <text class="faint" x="320" y="232" text-anchor="middle">脚跟一侧</text>
+        <path class="lead" d="M190,186 L150,246 H44"/><text x="44" y="270">左脚 · 夹在雪鞋外侧</text>
+        <path class="lead" d="M450,186 L490,246 H596"/><text x="596" y="270" text-anchor="end">右脚 · 夹在雪鞋外侧</text>
+        <text class="faint" x="320" y="294" text-anchor="middle">从上往下看，人朝脚尖一侧站</text>
+      </svg>
+      <pre class="ticker" aria-hidden="true"></pre>
+      <p class="tag">示意：传感器源源不断地送出这样的读数，每一行是一只脚在某一刻的状态。</p>
+    </div>
+    <ul class="spec">
+      <li><h3>运动传感器</h3><span class="rate">每秒 25 次</span><p>夹在雪鞋外侧，跟着脚一起动。感知往哪个方向用力、转得多快、脚和板是什么姿态，所有技术动作的信息都从这里来。</p></li>
+      <li class="b" data-b="1"><h3>气压计</h3><span class="rate">持续记录</span><p>感知高度变化：是在往下滑，还是坐缆车往上。</p></li>
+      <li class="b" data-b="2"><h3>手机 GPS</h3><span class="rate">可选</span><p>位置和速度。有就用；信号差或者没有，也照样能出结果。</p></li>
+    </ul>
+  </div>
+  <aside class="note"><p>硬件就是两只雪鞋外侧的传感器加手机。传感器夹在鞋上，跟着脚一起动。运动传感器是主角，所有动作信息都来自它；气压计负责判断“上还是下”；GPS 有了更好，没有也行。</p></aside>
+</section>
+
+<!-- 4 · journey -->
+<section class="slide" data-ctl="journey" data-sec="01 采集" data-steps="2">
+  <div class="head"><p class="eyebrow"><b>01</b> 采集 · 传感器</p><h2>数据的一趟旅程：坐上缆车，上一趟的结果就出来了</h2></div>
+  <div class="body" style="grid-template-rows:auto auto 1fr;align-content:start">
+    <svg class="flow-svg" viewBox="0 0 1200 170" role="img" aria-label="传感器经蓝牙到手机，上传到云端主链路，结果回到 App">
+      <path class="lk" id="lk1" d="M250,85 H360"/><path class="lk" id="lk2" d="M580,85 H690"/><path class="lk" id="lk3" d="M910,85 H1000"/>
+      <text class="lkl" x="305" y="70" text-anchor="middle">蓝牙</text><text class="lkl" x="635" y="70" text-anchor="middle">上传</text><text class="lkl" x="955" y="70" text-anchor="middle">结果</text>
+      <rect class="node" x="30" y="30" width="220" height="110" rx="12"/><text class="t1" x="140" y="78" text-anchor="middle">两只脚的传感器</text><text class="t2" x="140" y="108" text-anchor="middle">采集 IMU + 气压</text>
+      <rect class="node" x="360" y="30" width="220" height="110" rx="12"/><text class="t1" x="470" y="78" text-anchor="middle">手机 App</text><text class="t2" x="470" y="108" text-anchor="middle">接收 · 加上 GPS · 上传</text>
+      <rect class="node hot js-cloud" x="690" y="30" width="220" height="110" rx="12"/><text class="t1" x="800" y="78" text-anchor="middle">云端主链路</text><text class="t2" x="800" y="108" text-anchor="middle">识别 → 评价</text>
+      <rect class="node" x="1000" y="30" width="180" height="110" rx="12"/><text class="t1" x="1090" y="78" text-anchor="middle">App 展示</text><text class="t2" x="1090" y="108" text-anchor="middle">IQ · 指标 · 问题</text>
+      <g class="js-pk"></g>
+    </svg>
+    <div class="b" data-b="1">
+      <svg class="trig-svg" viewBox="0 0 1200 190" role="img" aria-label="高度曲线：滑下去，再坐缆车上来；开始爬升时触发结算">
+        <line class="base" x1="30" y1="162" x2="1170" y2="162"/>
+        <path class="alt" id="altPath" d="M40,34 C80,40 90,58 120,62 S170,82 200,86 S250,104 280,108 S330,126 360,130 S410,146 440,150 L540,152 L560,150 L860,30 L900,30 C940,36 950,52 980,56 S1030,76 1060,80 S1110,98 1150,104"/>
+        <text x="200" y="40">滑下去：数据一直在采、一直在传</text>
+        <text x="650" y="100" transform="rotate(-21.8 650 100)">坐缆车往上</text>
+        <g class="fire js-fire"><circle cx="575" cy="145" r="7"/><text x="592" y="184">开始往上走 → 分析刚滑完的这一趟</text></g>
+        <circle class="dotm js-dot" r="7" cx="40" cy="34"/>
+      </svg>
+    </div>
+    <div class="facts b" data-b="2">
+      <div><h3>滑的时候</h3><p>传感器一直在采，手机一直在传。</p></div>
+      <div><h3>坐上缆车</h3><p>系统发现开始往上走，就把刚滑完的那一趟拿去分析；结束滑雪时再分析一次。</p></div>
+      <div><h3>回到 App</h3><p>分析在云端完成，结果回到 App：IQ、各项指标和主要问题。</p></div>
+    </div>
+  </div>
+  <aside class="note"><p>用户感受到的节奏是：滑完一趟、坐上缆车，上一趟的结果就出来了。系统靠气压发现“开始往上走”，这就是分析的时机。</p></aside>
+</section>
+
+<!-- 5 · euler 3D -->
+<section class="slide" data-ctl="euler" data-sec="02 读图">
+  <div class="head"><p class="eyebrow"><b>02</b> 读图 · 欧拉角</p><h2>三个角，对应雪板的三种转动</h2></div>
+  <div class="body two">
+    <div class="stage euler-stage" role="img" aria-label="可旋转的 3D 雪板，演示 Roll、Pitch、Yaw 三种转动"></div>
+    <div class="col" style="justify-content:center">
+      <div class="ctrls" role="group" aria-label="演示">
+        <button class="btn" data-demo="auto" aria-pressed="true">自动轮播</button>
+        <button class="btn" data-demo="roll" aria-pressed="false">Roll</button>
+        <button class="btn" data-demo="pitch" aria-pressed="false">Pitch</button>
+        <button class="btn" data-demo="yaw" aria-pressed="false">Yaw</button>
+        <button class="btn" data-demo="combo" aria-pressed="false">连续转弯</button>
+      </div>
+      <div class="axes">
+        <div class="axcard ar" data-ax="r"><h3><span class="r">Roll</span>立刃角</h3><span class="val r" id="outRoll">0°</span>
+          <p>板子绕长轴侧倾。正负对应前刃 / 后刃，数值越大立刃越深。看图时最重要的一条线。</p>
+          <input type="range" id="rngRoll" min="-60" max="60" value="0" aria-label="Roll 角度"></div>
+        <div class="axcard ap" data-ax="p"><h3><span class="p">Pitch</span>俯仰</h3><span class="val p" id="outPitch">0°</span>
+          <p>板头抬起或压低。滑行中和坡度、前后压板有关，看图时作辅助。</p>
+          <input type="range" id="rngPitch" min="-40" max="40" value="0" aria-label="Pitch 角度"></div>
+        <div class="axcard ay" data-ax="y"><h3><span class="y">Yaw</span>朝向</h3><span class="val y" id="outYaw">0°</span>
+          <p>板头指向哪里。转弯就是 Yaw 来回摆动，它的波峰波谷就是弯与弯的分界。</p>
+          <input type="range" id="rngYaw" min="-90" max="90" value="0" aria-label="Yaw 角度"></div>
+      </div>
+    </div>
+  </div>
+  <aside class="note"><p>拖滑块或点按钮演示。记一句话：Roll 看立刃，Yaw 看转向，Pitch 当辅助。</p><p>真实数据里 Yaw 会带着整条雪道的方向，我们看的是它的来回摆动。</p></aside>
+</section>
+
+<!-- 6 · edge-pressure-steer -->
+<section class="slide" data-sec="02 读图" data-steps="3">
+  <div class="head"><p class="eyebrow"><b>02</b> 读图 · 对照教材</p><h2>教材讲“雪板三件事”，三条线上都看得到</h2><p class="lead">SBINZ 把雪板在一个弯里做的事归成三类：用刃、施压、转向。教练用眼睛看，我们用数据从板子这一侧记录下来。</p></div>
+  <div class="body eps">
+    <div class="eps-c er">
+      <svg class="eps-viz" viewBox="0 0 200 120" role="img" aria-label="雪板后视图左右侧倾"><line class="ev-snow" x1="20" y1="90" x2="180" y2="90"/><g class="ev-tilt"><rect x="52" y="80" width="96" height="8" rx="4" fill="var(--roll)"/><rect x="88" y="58" width="24" height="22" rx="4" fill="var(--ink)"/></g><text class="ev-lbl" x="14" y="24" fill="var(--roll-ink)">Roll</text></svg>
+      <span class="eps-en">EDGE · TILT &amp; TWIST</span>
+      <h3>用刃</h3>
+      <p>板子绕长轴倾斜，前后还能扭。决定抓雪有多牢。</p>
+      <p class="see">看 <span class="r">Roll</span>：立刃多深、多早、多稳</p>
+    </div>
+    <div class="eps-c ep b" data-b="1">
+      <svg class="eps-viz" viewBox="0 0 200 120" role="img" aria-label="雪板侧视图被压弯又弹回"><line class="ev-snow" x1="20" y1="96" x2="180" y2="96"/><g class="ev-bend"><path d="M24,66 Q100,96 176,66" fill="none" stroke="var(--ink)" stroke-width="6" stroke-linecap="round" vector-effect="non-scaling-stroke"/></g><path d="M100,14 V44" stroke="var(--ink2)" stroke-width="2.5"/><path d="M94,38 L100,48 L106,38 z" fill="var(--ink2)"/><text class="ev-lbl" x="14" y="24" fill="var(--ink2)">压</text></svg>
+      <span class="eps-en">PRESSURE · FLEX &amp; REBOUND</span>
+      <h3>施压</h3>
+      <p>板子被压弯、再弹回。决定板子有没有被“用起来”。</p>
+      <p class="see">看两只脚推算的形变和 G 力；前后分布看 <span class="p">Pitch</span></p>
+    </div>
+    <div class="eps-c ey b" data-b="2">
+      <svg class="eps-viz" viewBox="0 0 200 120" role="img" aria-label="雪板俯视图来回转向"><line class="ev-snow" x1="100" y1="6" x2="100" y2="116" stroke-dasharray="4 5"/><g class="ev-yaw"><rect x="92" y="16" width="16" height="92" rx="8" fill="var(--yaw)"/></g><text class="ev-lbl" x="14" y="24" fill="var(--yaw-ink)">Yaw</text></svg>
+      <span class="eps-en">STEER · PIVOT &amp; SPIN</span>
+      <h3>转向</h3>
+      <p>板子改变方向。走刃时板头板尾走同一条线；搓雪时板尾多甩出去一些。</p>
+      <p class="see">看 <span class="y">Yaw</span>：转了多少、转得多快</p>
+    </div>
+  </div>
+  <p class="foot b" data-b="3">教材里一个弯的顺序是：先立刃，再施压，最后转向。AASI 的六项基本功（前后、左右、压力大小、轴转、倾板、扭板）和 CASI 的五项技能（站姿平衡、旋转、用刃、压力、时机协调），讲的也是这几件事，外加“时机”。</p>
+  <aside class="note"><p>这一页把我们的三条线和教练的语言接上。教材说的“雪板表现”，就是我们传感器直接测到的东西：Roll 是用刃，Yaw 是转向，施压来自两只脚推算的形变和受力。</p><p>教材还强调顺序：先立刃、再施压、后转向。顺序乱了就是问题，这也是我们为什么有“时机”这个维度。</p></aside>
+</section>
+
+<!-- 7 · sync -->
+<section class="slide" data-ctl="sync" data-sec="02 读图" data-steps="4">
+  <div class="head"><p class="eyebrow"><b>02</b> 读图 · 欧拉角</p><h2>一个弯在图上长什么样</h2></div>
+  <div class="body sync">
+    <div class="stage sync-top" role="img" aria-label="俯视雪道，雪板做 S 形转弯"></div>
+    <div class="chart-col">
+      <div class="chart-bar">
+        <div class="keys"><span class="kr"><i></i>Roll 立刃（正 = 后刃，负 = 前刃，示意）</span><span class="ky"><i></i>Yaw 朝向（去掉了整体方向）</span></div>
+        <div class="ctrls"><button class="btn js-play" aria-pressed="false">暂停</button><button class="btn js-slow" aria-pressed="false">慢放</button></div>
+      </div>
+      <div class="stage plot sync-chart" role="img" aria-label="与左侧动画同步的 Roll 与 Yaw 曲线"></div>
+      <p class="foot"><b>看图口诀</b>　先数 <span class="y">Yaw</span> 的峰谷：几个弯、节奏匀不匀 → 再看 <span class="r">Roll</span> 过零和峰值：换刃了没、立刃多深 → 最后看形状：圆滑就是稳定，毛刺、平顶就是问题。<span class="tag">（示意曲线）</span></p>
+    </div>
+  </div>
+  <aside class="note"><p>按 → 依次点亮四个要点：</p><p>1. Yaw 的波峰波谷 = 弯与弯的分界。2. 同一时刻 Roll 正好过零 = 换刃。3. Roll 的峰值在弯中间 = 立刃最深。4. 一个弯按转向进度切成入弯、弯中、出弯。</p><p>两条线错开四分之一拍，这是规律转弯最典型的样子。</p><p>第 4 点里的三个阶段，教材叫发起、控制、完成（SBINZ / AASI 都这么分），完成之后就是下一个弯的准备。</p></aside>
+</section>
+
+<!-- 8 · patterns -->
+<section class="slide" data-ctl="patterns" data-sec="02 读图">
+  <div class="head"><p class="eyebrow"><b>02</b> 读图 · 欧拉角</p><h2>四种常见波形，一眼认出来</h2></div>
+  <div class="body pats">
+    <div class="pat"><div class="stage plot" role="img" aria-label="走刃波形"></div><div class="txt"><h3>走刃<span class="tm">Carved</span></h3><p>板头板尾走同一条线。<span class="r">Roll</span> 大、圆滑、正负交替；<span class="y">Yaw</span> 摆动规整。</p></div></div>
+    <div class="pat"><div class="stage plot" role="img" aria-label="搓雪波形"></div><div class="txt"><h3>搓雪<span class="tm">Skidded</span></h3><p>板尾比板头多甩出去一些，雪上留下宽痕。<span class="r">Roll</span> 小、顶部发平；<span class="y">Yaw</span> 摆得又快又大。</p></div></div>
+    <div class="pat"><div class="stage plot" role="img" aria-label="落叶飘波形"></div><div class="txt"><h3>落叶飘<span class="tm">Falling leaf</span></h3><p>教材里的入门练习：始终在同一条刃上，交替滑向板头、板尾。<span class="r">Roll</span> 不过零。不算转弯。</p></div></div>
+    <div class="pat"><div class="stage plot" role="img" aria-label="停顿波形"></div><div class="txt"><h3>停顿 / 直滑</h3><p>三条线都很平。滑行中出现一段长平台，往往就是滑行段被切开的地方。</p></div></div>
+  </div>
+  <aside class="note"><p>四张图都是示意曲线。教大家抓特征：看 Roll 过不过零、幅度多大、顶部圆不圆；看 Yaw 摆得规不规整。</p><p>教材把弯按“表现”分成搓雪弯、立刃弯、走刃弯，区别在转向角：板头板尾走同一条线就是走刃，板尾甩得越多越接近搓雪。</p><p>落叶飘是教材里的入门练习（同一条刃来回滑），算法会把它单独识别出来，不当成转弯算分。</p></aside>
+</section>
+
+<!-- 8 · hierarchy -->
+<section class="slide" data-sec="03 识别" data-steps="4">
+  <div class="head"><p class="eyebrow"><b>03</b> 识别 · 滑雪识别逻辑</p><h2>识别就是把一天拆成五层</h2></div>
+  <div class="body" style="min-height:0">
+    <svg class="hier" viewBox="0 0 1200 540" preserveAspectRatio="xMidYMid meet" role="img" aria-label="一次滑雪、一趟、滑行段、弯组、一个弯，五层逐级放大">
+      <defs><pattern id="hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line class="hatch-l" x1="0" y1="0" x2="0" y2="8"/></pattern></defs>
+      <g>
+        <text class="nm" x="0" y="44">一次滑雪</text><text class="ds" x="0" y="66">从开机到结束</text>
+        <rect class="base" x="230" y="26" width="960" height="40" rx="6"/>
+        <rect class="run" x="262" y="26" width="160" height="40"/><rect class="hatch" x="422" y="26" width="96" height="40"/>
+        <rect class="run hot" x="518" y="26" width="236" height="40"/><rect class="hatch" x="754" y="26" width="96" height="40"/>
+        <rect class="run" x="850" y="26" width="300" height="40"/>
+        <text class="in" x="342" y="51" text-anchor="middle">第 1 趟</text><text class="inw" x="636" y="51" text-anchor="middle">第 2 趟</text><text class="in" x="1000" y="51" text-anchor="middle">第 3 趟</text>
+        <text class="ds" x="470" y="86" text-anchor="middle">缆车</text><text class="ds" x="802" y="86" text-anchor="middle">缆车</text>
+      </g>
+      <g class="b" data-b="1">
+        <polygon class="fun" points="518,66 754,66 1190,132 230,132"/>
+        <text class="nm" x="0" y="152">一趟</text><text class="ds" x="0" y="174">坐缆车分开</text>
+        <rect class="base" x="230" y="132" width="960" height="40" rx="6"/>
+        <rect class="seg hot" x="230" y="132" width="440" height="40"/><rect class="hatch" x="670" y="132" width="70" height="40"/><rect class="seg" x="740" y="132" width="450" height="40"/>
+        <text class="inw" x="450" y="157" text-anchor="middle">滑行段 1</text><text class="ds" x="705" y="192" text-anchor="middle">停下</text><text class="in" x="965" y="157" text-anchor="middle">滑行段 2</text>
+      </g>
+      <g class="b" data-b="2">
+        <polygon class="fun" points="230,172 670,172 1190,238 230,238"/>
+        <text class="nm" x="0" y="258">滑行段</text><text class="ds" x="0" y="280">停下来分开</text>
+        <rect class="base" x="230" y="238" width="960" height="40" rx="6"/>
+        <rect class="blk hot" x="230" y="238" width="430" height="40"/><rect class="blk" x="672" y="238" width="518" height="40"/>
+        <g id="blkTicks"></g>
+        <text class="inw" x="445" y="263" text-anchor="middle">弯组 1</text><text class="in" x="931" y="263" text-anchor="middle">弯组 2</text>
+      </g>
+      <g class="b" data-b="3">
+        <polygon class="fun" points="230,278 660,278 1190,344 230,344"/>
+        <text class="nm" x="0" y="364">弯组</text><text class="ds" x="0" y="386">节奏、弯型相近的一组弯</text><text class="ds" x="0" y="406">评价以弯组为单位</text>
+        <g id="cells"></g>
+      </g>
+      <g class="b" data-b="4">
+        <polygon class="fun" points="508,384 642,384 1190,450 230,450"/>
+        <text class="nm" x="0" y="470">一个弯</text><text class="ds" x="0" y="492">Yaw 的峰谷分开</text>
+        <rect class="ph ph1" x="230" y="450" width="300" height="44" rx="6"/><rect class="ph ph2" x="530" y="450" width="360" height="44" rx="6"/><rect class="ph ph3" x="890" y="450" width="300" height="44" rx="6"/>
+        <text class="in" x="380" y="477" text-anchor="middle">入弯</text><text class="inw" x="710" y="477" text-anchor="middle">弯中 · 立刃最深</text><text class="in" x="1040" y="477" text-anchor="middle">出弯</text>
+      </g>
+    </svg>
+  </div>
+  <aside class="note"><p>这是识别部分的框架。一层一层往下拆，每一层靠什么分开：趟靠缆车，滑行段靠停下，弯组靠节奏和弯型的变化，单个弯靠 Yaw 的峰谷（第二部分讲过）。</p><p>App 里看到的分数和指标，都挂在某个弯组上。</p></aside>
+</section>
+
+<!-- 9 · segmentation -->
+<section class="slide" data-ctl="segment" data-sec="03 识别" data-steps="3">
+  <div class="head"><p class="eyebrow"><b>03</b> 识别 · 滑雪识别逻辑</p><h2>拆的第一刀：从一整天里找出在滑雪的时间</h2></div>
+  <div class="body two-r">
+    <ol class="steps">
+      <li class="on"><span class="n">1</span><div><h3>一整天的高度</h3><p>坐缆车慢慢上去，滑雪快速下来，高度像锯齿。</p></div></li>
+      <li class="b" data-b="1"><span class="n">2</span><div><h3>判断是不是在滑</h3><p>根据两只脚的动作，判断每个时刻是不是在滑雪。</p></div></li>
+      <li class="b" data-b="2"><span class="n">3</span><div><h3>连成滑行段</h3><p>连续在滑的时间连成一段；停下来就断开。</p></div></li>
+      <li class="b" data-b="3"><span class="n">4</span><div><h3>按缆车分趟</h3><p>高度回升说明坐了缆车，前后分成不同的趟。</p></div></li>
+    </ol>
+    <div class="chart-col">
+      <div class="stage plot" role="img" aria-label="一天的高度曲线、是否在滑雪的判断和识别出的滑行段"></div>
+      <p class="tag">示意数据：一上午三趟，第一趟中途停了一次。</p>
+    </div>
+  </div>
+  <aside class="note"><p>判断“在不在滑”靠的是动作，不是高度；高度用来分趟。</p><p>找出滑行段之后，后面的事情就是在每段里继续往下拆：按 Yaw 峰谷切出一个个弯，再把节奏相近的弯归成一组。</p></aside>
+</section>
+
+<!-- 10 · pyramid -->
+<section class="slide" data-sec="04 评价" data-steps="3">
+  <div class="head"><p class="eyebrow"><b>04</b> 评价 · 指标体系</p><h2>三层指标：从每个弯，到一个分数</h2></div>
+  <div class="body pyr-wrap">
+    <div class="pyr">
+      <div class="pyr-ax" aria-hidden="true"><span>抽象</span><i></i><span>具体</span></div>
+      <div class="lvl l3 b" data-b="2"><div class="lv-h"><span class="lv-k">IQ</span><span class="lv-s">一个分数 · 整体水平</span></div><p>这组弯整体滑得怎么样，0 – 200。</p></div>
+      <div class="lvl l2 b" data-b="1"><div class="lv-h"><span class="lv-k">进阶指标</span><span class="lv-s">每组弯一套 · 动作质量</span></div><p>和 IQ 看的是同一组代表性的弯。归成四个维度：时机、施压、流畅、一致性，用来解释 IQ 强在哪、弱在哪。</p></div>
+      <div class="lvl l1"><div class="lv-h"><span class="lv-k">技术指标</span><span class="lv-s">每个弯一套 · 具体动作</span></div>
+        <div class="rtp"><div><b>幅度</b><span>立刃角 · 出弯幅度 · 转弯半径</span></div><div><b>时机</b><span>提前立刃 · 换刃减压 · 弯的时长</span></div><div><b>力度</b><span>侧向 G 力 · 形变施压 · 旋转速率</span></div></div>
+        <p class="src">教材说任何动作都能用“幅度 · 时机 · 力度”来衡量（SBINZ），技术指标就是把它们变成数字。</p></div>
+    </div>
+    <div class="pyr-side">
+      <div class="side b" data-b="3"><h3>技术分类</h3><p>每个弯判成走刃或搓雪，对应教材的走刃弯 / 搓雪弯。走刃多就按走刃的标准评价，否则按搓雪的标准。</p></div>
+      <div class="side b" data-b="3"><h3>问题识别</h3><p>在每个弯里找短板，反复出现的才算问题，再结合当前水平决定先提哪些。和教材里教练分析学员的方法一致。</p></div>
+    </div>
+  </div>
+  <aside class="note"><p>这一页回答“IQ、进阶指标、技术指标是什么关系”。越往下越具体，越往上越抽象。</p><p>技术指标描述每个弯做了什么；进阶指标描述一组弯的动作质量；IQ 是一个总评。IQ 和进阶指标来自同一组弯，所以分数和解释分数的指标永远对得上。</p><p>旁边两件事：技术分类决定用哪把尺子量；问题识别从技术指标里找反复出现的短板。</p></aside>
+</section>
+
+<!-- 11 · dims -->
+<section class="slide" data-sec="04 评价">
+  <div class="head"><p class="eyebrow"><b>04</b> 评价 · 指标体系</p><h2>四个维度，各看哪些进阶指标</h2></div>
+  <div class="body dims">
+    <div class="dim"><span class="en">Timing</span><h3>时机</h3><p class="q">动作做得及时吗</p><p class="src">AASI 的 TID（时机 · 强度 · 持续）；SBINZ：中级要在落线前换刃</p><ul>
+      <li><b>提前立刃</b><span>换刃之后多快把刃立起来</span></li>
+      <li><b>立刃建立</b><span>弯的主体阶段，刃立得够不够足</span></li>
+      <li><b>换刃减压</b><span>换刃时有没有把板子放轻</span></li></ul></div>
+    <div class="dim"><span class="en">Pressure</span><h3>施压</h3><p class="q">压住板子了吗</p><p class="src">SBINZ 施压：压弯、弹回；AASI F3：控制压力大小</p><ul>
+      <li><b>形变施压</b><span>弯中有没有把板子压出变形</span></li>
+      <li><b>侧向 G 力</b><span>转弯时承受的横向力</span></li>
+      <li><b>出弯幅度</b><span>弯有没有转完整</span></li>
+      <li><b>旋转速率</b><span>转向的快慢</span></li></ul></div>
+    <div class="dim"><span class="en">Flow</span><h3>流畅</h3><p class="q">动作顺不顺</p><p class="src">SBINZ 融合动作：压力和刃角要平顺地加、平顺地放</p><ul>
+      <li><b>立刃稳定性</b><span>立刃曲线圆不圆滑、有没有抖</span></li>
+      <li><b>节奏</b><span>弯与弯的时长、幅度是否均匀</span></li>
+      <li><b>弯形质量</b><span>弯的形状是否圆润</span></li></ul></div>
+    <div class="dim"><span class="en">Similarity</span><h3>一致性</h3><p class="q">每个弯稳不稳定</p><p class="src">AASI：弯的大小、形状保持一致；CASI：前后刃是否对称</p><ul>
+      <li><b>立刃一致性</b><span>每个弯的立刃过程像不像</span></li>
+      <li><b>速度一致性</b><span>速度控制是否平稳</span></li>
+      <li><b>半径一致性</b><span>弯的大小是否一致</span></li></ul></div>
+  </div>
+  <p class="foot">IQ 是总评，四个维度是画像。同样的分数，有人强在施压，有人强在一致性。四个维度不是简单相加得到 IQ。</p>
+  <aside class="note"><p>四个维度是给用户“看懂自己”用的：同样 120 分，有人强在施压，有人强在一致性。</p><p>常被问到的问题：四个维度平均一下为什么不等于总分？因为总分是整体评价，维度是解释用的画像，两者不是加减关系。</p></aside>
+</section>
+
+<!-- 12 · issues -->
+<section class="slide" data-ctl="issues" data-sec="04 评价" data-steps="1">
+  <div class="head"><p class="eyebrow"><b>04</b> 评价 · 指标体系</p><h2>问题识别：反复出现的短板才算问题</h2></div>
+  <div class="body iss">
+    <div class="icard"><h3>缺少提前换刃<span class="tm">Late edge change</span></h3><div class="stage" role="img" aria-label="Roll 过零晚于 Yaw 边界"></div><p>上一个弯快结束时还没开始换刃，换刃拖进了下一个弯。</p></div>
+    <div class="icard"><h3>J 型弯<span class="tm">Rushing the turn</span></h3><div class="stage" role="img" aria-label="Yaw 先平后急转"></div><p>弯中夹直板：上半段没做出来，先直着走，再急着拧过去。</p></div>
+    <div class="icard"><h3>转弯犹豫<span class="tm">Hesitation</span></h3><div class="stage" role="img" aria-label="两个弯之间有平台"></div><p>两个弯之间停顿、拖拉，节奏断开。</p></div>
+    <div class="icard"><h3>立刃不稳定<span class="tm">Edge control</span></h3><div class="stage" role="img" aria-label="Roll 弯中忽深忽浅"></div><p>弯中立刃忽深忽浅，曲线不圆滑。</p></div>
+    <div class="icard"><h3>立刃突突<span class="tm">Chatter</span></h3><div class="stage" role="img" aria-label="Roll 上有高频抖动"></div><p>板刃高频抖动，刃没有咬住雪。</p></div>
+    <div class="icard"><h3>甩板尾<span class="tm">Over-rotation</span></h3><div class="stage" role="img" aria-label="Yaw 在弯尾急甩"></div><p>靠后脚把板尾甩出去来完成转向。</p></div>
+  </div>
+  <div class="logic b" data-b="1">
+    <span class="stp">逐个弯检查</span><span class="arw">→</span><span class="stp">数一数反复出现几次</span><span class="arw">→</span><span class="stp">结合当前水平</span><span class="arw">→</span><span class="stp">先提最关键的</span>
+    <span class="nt">和教材的做法一致：SBINZ 建议看 20 个弯，数每种问题出现几次，先改出现最多的。教材里初级弯本来就在落线处换刃，所以新手阶段不提“缺少提前换刃”。</span>
+  </div>
+  <aside class="note"><p>小图是每种问题在曲线上的典型样子（示意），可以和第二部分的读图方法对照着看。</p><p>问题识别不是“出现一次就报”：要在一组弯里反复出现，并且结合这个人现在的水平来决定提不提。</p></aside>
+</section>
+
+<!-- 14 · analysis loop -->
+<section class="slide" data-ctl="loop" data-sec="04 评价" data-steps="4">
+  <div class="head"><p class="eyebrow"><b>04</b> 评价 · 对照教材</p><h2>和教练分析学员，是同一个闭环</h2><p class="lead">教材里，分析从“看到的事实”开始，落到“下一步练什么”。我们把前面两步做成了数据。</p></div>
+  <div class="body" style="grid-template-rows:1fr auto;align-content:center">
+    <div class="loop">
+      <div class="lp"><span class="k">STEP 1</span><h3>观察事实</h3><p class="q">“分析从基于事实的观察开始。” —— SBINZ</p><p class="us">传感器记录每一个弯：用刃、施压、转向。</p><span class="who d">数据</span></div>
+      <div class="lp b" data-b="1"><span class="k">STEP 2</span><h3>对比理想</h3><p class="q">“先建立理想的表现，再拿学员的滑行来对比。” —— CASI</p><p class="us">技术指标、进阶指标和 IQ，就是这把尺子。</p><span class="who d">数据</span></div>
+      <div class="lp b" data-b="2"><span class="k">STEP 3</span><h3>分清因果</h3><p class="q">“看到的往往是结果，要倒推原因；根源常在前一个阶段、前一个弯。” —— 因果与多米诺效应</p><p class="us">问题识别给出“果”，曲线上能往前看几个弯。</p><span class="who c">数据 + 教练</span></div>
+      <div class="lp b" data-b="3"><span class="k">STEP 4</span><h3>排优先、给练习</h3><p class="q">“一次只改影响最大的那一处。” —— SBINZ / CASI</p><p class="us">反复出现才提，结合水平先提最关键的；怎么练，来自教材的进阶练习。</p><span class="who c">教练 + 教材</span></div>
+    </div>
+    <div class="ret b" data-b="4"><i></i><span>练完再滑，下一趟的数据再看一次</span></div>
+  </div>
+  <aside class="note"><p>这页讲我们和教练的分工。传感器看到的是“果”：板子做了什么；教材负责解释“因”：身体该怎么动、怎么练。</p><p>教材的分析流程：观察事实、对比理想、分清因果、排优先。前两步我们已经数据化，第三步给出线索，第四步的练习方法来自教材。</p></aside>
+</section>
+
+<!-- 15 · recap -->
+<section class="slide" data-ctl="recap" data-sec="回顾">
+  <div class="head"><p class="eyebrow">回顾</p><h2>整套框架，一张图</h2></div>
+  <div class="recap">
+    <div class="lane"><span class="ln">01<b>采集</b></span><div class="nodes"><span>两只脚的传感器</span><i>›</i><span>手机</span><i>›</i><span>云端</span></div></div>
+    <div class="lane"><span class="ln">03<b>识别</b></span><div class="nodes"><span>一天</span><i>›</i><span>一趟</span><i>›</i><span>滑行段</span><i>›</i><span>弯组</span><i>›</i><span>一个弯</span></div></div>
+    <div class="lane"><span class="ln">04<b>评价</b></span><div class="nodes"><span>技术指标</span><i>›</i><span>进阶指标 · 四个维度</span><i>›</i><span>IQ</span><i>›</i><span>问题识别</span><i>›</i><span>App</span></div></div>
+    <p class="small">02 读图贯穿全程：每一步的判断，都能在 Roll / Pitch / Yaw 三条线上找到对应的样子。</p>
+    <p class="small">理念对照：雪板三件事（用刃 · 施压 · 转向）· 动作三要素（幅度 · 时机 · 力度）· 分析闭环（观察 → 对比 → 因果 → 优先），来自 SBINZ、AASI、CASI 教学体系。</p>
+    <p class="qa">Q &amp; A</p>
+  </div>
+  <aside class="note"><p>收尾：采集、识别、评价三步，加上欧拉角这门“语言”。欢迎提问。</p></aside>
+</section>
+
+</main>
+
+<nav class="bar" aria-label="翻页">
+  <span class="where"><b class="js-page">1 / 15</b><span class="js-sec">开场</span></span>
+  <div class="prog js-prog"></div>
+  <div class="nav">
+    <button class="btn js-prev" aria-label="上一步">‹</button>
+    <button class="btn js-next" aria-label="下一步">›</button>
+    <button class="btn js-notes" aria-pressed="false">讲稿</button>
+    <button class="btn js-replay">重播</button>
+  </div>
+</nav>
+<div class="notes js-notesbox" hidden><h4>讲稿</h4><div class="js-notestext"></div></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+'use strict';
+const RM = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const $ = (s, el) => (el || document).querySelector(s);
+const $$ = (s, el) => Array.from((el || document).querySelectorAll(s));
+const CN = '"Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif';
+const MONO = '"JetBrains Mono",Menlo,Consolas,monospace';
+
+/* ---------- theme tokens for canvas ---------- */
+const C = {}; let THEMEV = 0;
+const TOK = ['bg','panel','ink','ink2','ink3','line','grid','mute','roll','roll-ink','yaw','yaw-ink','pitch','ok'];
+function readColors(){ const cs = getComputedStyle(document.documentElement); TOK.forEach(k => { C[k] = cs.getPropertyValue('--' + k).trim() || '#888888'; }); THEMEV++; }
+readColors();
+function alpha(hex, a){
+  let h = (hex || '#888888').replace('#','');
+  if (h.length === 3) h = h.split('').map(c => c + c).join('');
+  const n = parseInt(h, 16);
+  return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + a + ')';
+}
+
+/* ---------- small math helpers ---------- */
+function rng(seed){ return function(){ seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function noiseFn(seed, amp, freqs){ const r = rng(seed); const f = freqs || [1.7, 3.1, 5.3]; const ph = f.map(() => r() * 6.283); return t => f.reduce((s, q, i) => s + Math.sin(t * q + ph[i]) / (i + 1), 0) * amp / 1.8; }
+const clamp01 = v => Math.max(0, Math.min(1, v));
+const ease = v => v < .5 ? 2 * v * v : 1 - Math.pow(-2 * v + 2, 2) / 2;
+
+/* ---------- canvas helpers ---------- */
+function Stage(el, onResize){
+  const cv = document.createElement('canvas'); el.appendChild(cv);
+  const ctx = cv.getContext('2d'); const s = { el: el, cv: cv, ctx: ctx, w: 1, h: 1 };
+  const fit = () => { const r = el.getBoundingClientRect(); if (!r.width || !r.height) return; const d = Math.min(window.devicePixelRatio || 1, 2);
+    s.w = r.width; s.h = r.height; cv.width = Math.round(r.width * d); cv.height = Math.round(r.height * d); ctx.setTransform(d, 0, 0, d, 0, 0); if (onResize) onResize(); };
+  if (window.ResizeObserver) new ResizeObserver(fit).observe(el); else window.addEventListener('resize', fit);
+  fit(); return s;
+}
+function rrect(ctx, x, y, w, h, r){ r = Math.min(r, w / 2, h / 2); ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+function line(ctx, pts, color, w, dash){ if (pts.length < 2) return; ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = w || 2; ctx.lineJoin = 'round'; ctx.lineCap = 'round'; if (dash) ctx.setLineDash(dash); ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]); ctx.stroke(); ctx.restore(); }
+function dot(ctx, x, y, r, color){ ctx.beginPath(); ctx.arc(x, y, r, 0, 6.2832); ctx.fillStyle = color; ctx.fill(); }
+function ring(ctx, x, y, r, color, w){ ctx.beginPath(); ctx.arc(x, y, r, 0, 6.2832); ctx.strokeStyle = color; ctx.lineWidth = w || 2; ctx.stroke(); }
+function label(ctx, text, x, y, color, o){
+  o = o || {}; const fs = o.fs || 12; ctx.save(); ctx.font = (o.weight || 600) + ' ' + fs + 'px ' + (o.mono ? MONO : CN);
+  ctx.textAlign = o.align || 'left'; ctx.textBaseline = 'middle';
+  if (o.bg){ const w = ctx.measureText(text).width + 10; const lx = o.align === 'center' ? x - w / 2 : o.align === 'right' ? x - w + 5 : x - 5; ctx.fillStyle = o.bg; rrect(ctx, lx, y - fs / 2 - 4, w, fs + 8, 4); ctx.fill(); }
+  ctx.fillStyle = color; ctx.fillText(text, x, y); ctx.restore();
+}
+function plotFrame(ctx, b, ymin, ymax, o){
+  o = o || {}; const Y = v => b.y + b.h * (1 - (v - ymin) / (ymax - ymin));
+  ctx.save(); ctx.font = '500 ' + (o.fs || 11) + 'px ' + MONO; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+  (o.ticks || []).forEach(v => { ctx.strokeStyle = v === 0 ? alpha(C.ink3, .7) : C.grid; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(b.x, Math.round(Y(v)) + .5); ctx.lineTo(b.x + b.w, Math.round(Y(v)) + .5); ctx.stroke();
+    if (!o.noLabels){ ctx.fillStyle = C.ink3; ctx.fillText((v > 0 ? '+' : '') + v + (o.unit || ''), b.x - 6, Y(v)); } });
+  ctx.restore(); return Y;
+}
+function fsFor(w){ return Math.max(11, Math.min(14, w / 60)); }
+
+/* ---------- carving model (shared by cover + sync) ---------- */
+const CARVE = { P: 3.2, Ymax: 52, Rmax: 40 };
+const XT = (function(){ const N = 720, a = new Float32Array(N + 1); let acc = 0;
+  for (let i = 0; i <= N; i++){ const s = 2 * Math.PI * i / N; a[i] = acc; acc += Math.tan(CARVE.Ymax * Math.PI / 180 * Math.cos(s)) * (2 * Math.PI / N); }
+  let mn = Infinity, mx = -Infinity; for (let i = 0; i <= N; i++){ mn = Math.min(mn, a[i]); mx = Math.max(mx, a[i]); }
+  return { a: a, mid: (mn + mx) / 2, half: (mx - mn) / 2, N: N }; })();
+function carveX(s){ const N = XT.N; const u = (((s % 6.28319) + 6.28319) % 6.28319) / 6.28319 * N; const i = Math.min(N - 1, Math.floor(u)), f = u - i; return ((XT.a[i] * (1 - f) + XT.a[i + 1] * f) - XT.mid) / XT.half; }
+function carve(t){ const s = 2 * Math.PI * t / CARVE.P; return { s: s, yaw: CARVE.Ymax * Math.cos(s), roll: CARVE.Rmax * (Math.sin(s) + 0.08 * Math.sin(3 * s)) / 1.0 }; }
+
+const TREES = (function(){ const r = rng(7), a = []; for (let i = 0; i < 22; i++) a.push({ side: r() < .5 ? 0 : 1, y: r(), s: .6 + r() * .6, dx: r() }); return a; })();
+const SPECK = (function(){ const r = rng(11), a = []; for (let i = 0; i < 110; i++) a.push([r(), r()]); return a; })();
+
+function drawSlope(ctx, b, t, o){
+  o = o || {};
+  const A = b.w * 0.26, cx = b.x + b.w / 2, by = b.y + b.h * 0.62, om = 2 * Math.PI / CARVE.P, v = A * om / XT.half;
+  ctx.save(); ctx.beginPath(); ctx.rect(b.x, b.y, b.w, b.h); ctx.clip();
+  const H = b.h;
+  ctx.fillStyle = alpha(C.ink3, .28);
+  for (const p of SPECK){ const y = b.y + ((p[1] * H - v * t) % H + H) % H; ctx.fillRect(b.x + p[0] * b.w, y, 1.6, 1.6); }
+  const span = H * 1.4;
+  for (const tr of TREES){ const y = b.y - H * .2 + (((tr.y * span - v * t) % span) + span) % span; const m = b.w * .06; const x = tr.side ? b.x + b.w - (12 + tr.dx * m) : b.x + 12 + tr.dx * m; const sz = 8 * tr.s * Math.max(1, b.w / 520);
+    ctx.fillStyle = alpha(C.ink2, .32); ctx.beginPath(); ctx.moveTo(x, y - sz * 1.7); ctx.lineTo(x + sz * .8, y); ctx.lineTo(x - sz * .8, y); ctx.closePath(); ctx.fill(); }
+  const tspan = 2.6; const grd = ctx.createLinearGradient(0, by, 0, by - v * tspan); grd.addColorStop(0, alpha(C.ink, .6)); grd.addColorStop(1, alpha(C.ink, 0));
+  ctx.strokeStyle = grd; ctx.lineWidth = 2.2; ctx.lineCap = 'round'; ctx.beginPath();
+  for (let i = 0; i <= 140; i++){ const tau = t - tspan * i / 140; const x = cx + A * carveX(om * tau), y = by - v * (t - tau); if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y); }
+  ctx.stroke();
+  const c = carve(t); const bx = cx + A * carveX(c.s); const th = c.yaw * Math.PI / 180;
+  const L = Math.min(b.w, b.h) * 0.22, Wd = L * 0.27;
+  ctx.translate(bx, by); ctx.rotate(-th);
+  ctx.fillStyle = alpha(C.ink, .16); rrect(ctx, -Wd / 2 + c.roll * .1, -L / 2 + 3, Wd, L, Wd / 2); ctx.fill();
+  ctx.fillStyle = C.ink; rrect(ctx, -Wd / 2, -L / 2, Wd, L, Wd / 2); ctx.fill();
+  ctx.fillStyle = C.panel;
+  for (const k of [-1, 1]){ ctx.save(); ctx.translate(0, k * L * .2); ctx.rotate(k * .22); rrect(ctx, -Wd * .36, -L * .045, Wd * .72, L * .09, 2); ctx.fill(); ctx.restore(); }
+  ctx.restore();
+  label(ctx, '下山方向 ↓', b.x + b.w - 12, b.y + 18, C.ink3, { align: 'right', fs: fsFor(b.w) });
+  if (o.gauge) drawGauge(ctx, b.x + 12, b.y + 12, c, fsFor(b.w));
+}
+function drawGauge(ctx, x, y, c, fs){
+  const w = 150, h = 78; ctx.save(); ctx.fillStyle = alpha(C.panel, .92); ctx.strokeStyle = C.line; ctx.lineWidth = 1; rrect(ctx, x, y, w, h, 8); ctx.fill(); ctx.stroke();
+  const gx = x + 38, gy = y + h / 2 + 4; ctx.strokeStyle = C.ink3; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(gx - 26, gy + 10); ctx.lineTo(gx + 26, gy + 10); ctx.stroke();
+  ctx.save(); ctx.translate(gx, gy); ctx.rotate(-c.roll * Math.PI / 180); ctx.fillStyle = C.roll; rrect(ctx, -22, -3, 44, 6, 3); ctx.fill(); ctx.fillStyle = C.ink; ctx.fillRect(-3, -15, 6, 12); ctx.restore();
+  label(ctx, '后视', gx, y + 13, C.ink3, { align: 'center', fs: 10.5, weight: 500 });
+  label(ctx, 'Roll', x + 76, y + 26, C.ink3, { fs: fs - 1, weight: 500 }); label(ctx, (c.roll >= 0 ? '+' : '') + c.roll.toFixed(0) + '°', x + w - 10, y + 26, C['roll-ink'], { align: 'right', fs: fs + 1, mono: true });
+  label(ctx, 'Yaw', x + 76, y + 54, C.ink3, { fs: fs - 1, weight: 500 }); label(ctx, (c.yaw >= 0 ? '+' : '') + c.yaw.toFixed(0) + '°', x + w - 10, y + 54, C['yaw-ink'], { align: 'right', fs: fs + 1, mono: true });
+  ctx.restore();
+}
+function drawStrip(ctx, b, t, span){
+  ctx.save(); ctx.fillStyle = C.bg; ctx.fillRect(b.x, b.y, b.w, b.h); ctx.strokeStyle = C.line; ctx.beginPath(); ctx.moveTo(b.x, b.y + .5); ctx.lineTo(b.x + b.w, b.y + .5); ctx.stroke();
+  const ib = { x: b.x + 12, y: b.y + 12, w: b.w - 24, h: b.h - 24 }; const Y = v => ib.y + ib.h * (1 - (v + 60) / 120);
+  ctx.strokeStyle = alpha(C.ink3, .5); ctx.beginPath(); ctx.moveTo(ib.x, Y(0)); ctx.lineTo(ib.x + ib.w, Y(0)); ctx.stroke();
+  const R = [], W = [];
+  for (let i = 0; i <= 160; i++){ const tau = t - span + span * i / 160; const c = carve(tau); const x = ib.x + ib.w * i / 160; R.push([x, Y(c.roll)]); W.push([x, Y(c.yaw)]); }
+  line(ctx, W, C.yaw, 2); line(ctx, R, C.roll, 2);
+  label(ctx, 'Roll', ib.x + 2, ib.y + 4, C['roll-ink'], { fs: 11 }); label(ctx, 'Yaw', ib.x + 40, ib.y + 4, C['yaw-ink'], { fs: 11 });
+  ctx.restore();
+}
+
+/* ---------- deck engine ---------- */
+const slides = $$('.slide');
+const CTL = {}; const inst = [];
+let cur = -1, step = 0, rafId = 0;
+function stepsOf(i){ return +(slides[i].dataset.steps || 0); }
+function ctl(i){ const s = slides[i]; const name = s.dataset.ctl; if (!name || !CTL[name]) return null; if (!inst[i]){ try { inst[i] = CTL[name](s); } catch (e) { console.error(e); inst[i] = {}; } } return inst[i]; }
+function kickFor(s){ return () => { if (slides[cur] === s) startLoop(); }; }
+function startLoop(){
+  cancelAnimationFrame(rafId); const c = inst[cur]; if (!c || !c.frame) return;
+  const tick = ts => { if (inst[cur] !== c) return; let keep = false; try { keep = c.frame(ts); } catch (e) { console.error(e); } if (keep) rafId = requestAnimationFrame(tick); };
+  rafId = requestAnimationFrame(tick);
+}
+function applyStep(i, n){
+  const s = slides[i]; $$('.b', s).forEach(e => e.classList.toggle('on', (+e.dataset.b || 1) <= n));
+  $$('.steps li', s).forEach(li => { if (li.classList.contains('b')) return; li.classList.add('on'); });
+  const c = inst[i]; if (c && c.step) c.step(n);
+}
+function go(i, n, replay){
+  i = Math.max(0, Math.min(slides.length - 1, i));
+  if (i !== cur || replay){
+    if (cur >= 0 && i !== cur){ slides[cur].classList.remove('active'); slides[cur].setAttribute('aria-hidden', 'true'); const p = inst[cur]; if (p && p.leave) p.leave(); }
+    cur = i; const s = slides[i]; s.classList.add('active'); s.removeAttribute('aria-hidden'); s.scrollTop = 0;
+    const c = ctl(i); if (c && c.enter) c.enter();
+  }
+  step = n || 0; applyStep(i, step); updateUI(); startLoop();
+  try { history.replaceState(null, '', '#p' + (i + 1)); } catch (e) {}
+}
+function next(){ if (step < stepsOf(cur)) go(cur, step + 1); else if (cur < slides.length - 1) go(cur + 1, 0); }
+function prev(){ if (step > 0) go(cur, step - 1); else if (cur > 0) go(cur - 1, stepsOf(cur - 1)); }
+
+const prog = $('.js-prog');
+slides.forEach((s, i) => { const b = document.createElement('button'); b.setAttribute('aria-label', '第 ' + (i + 1) + ' 页'); if (i > 0 && s.dataset.sec !== slides[i - 1].dataset.sec) b.classList.add('gap'); b.addEventListener('click', () => go(i, 0)); prog.appendChild(b); });
+const notesBox = $('.js-notesbox'), notesText = $('.js-notestext'), notesBtn = $('.js-notes');
+function updateUI(){
+  $('.js-page').textContent = (cur + 1) + ' / ' + slides.length;
+  $('.js-sec').textContent = slides[cur].dataset.sec || '';
+  $$('button', prog).forEach((b, i) => { b.classList.toggle('cur', i === cur); b.classList.toggle('done', i < cur); });
+  const n = $('.note', slides[cur]); notesText.innerHTML = n ? n.innerHTML : '';
+}
+function toggleNotes(){ notesBox.hidden = !notesBox.hidden; notesBtn.setAttribute('aria-pressed', String(!notesBox.hidden)); }
+$('.js-next').addEventListener('click', next);
+$('.js-prev').addEventListener('click', prev);
+notesBtn.addEventListener('click', toggleNotes);
+$('.js-replay').addEventListener('click', () => go(cur, 0, true));
+$$('[data-go]').forEach(b => b.addEventListener('click', () => go(+b.dataset.go - 1, 0)));
+document.addEventListener('keydown', e => {
+  if (e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  const k = e.key;
+  if (k === 'ArrowRight' || k === 'PageDown' || k === ' ' || k === 'Enter'){ if ((k === 'Enter' || k === ' ') && e.target && e.target.tagName === 'BUTTON') return; e.preventDefault(); next(); }
+  else if (k === 'ArrowLeft' || k === 'PageUp'){ e.preventDefault(); prev(); }
+  else if (k === 'Home'){ go(0, 0); } else if (k === 'End'){ go(slides.length - 1, 0); }
+  else if (k === 'n' || k === 'N'){ toggleNotes(); }
+  else if (k === 'r' || k === 'R'){ go(cur, 0, true); }
+});
+let tx = 0, ty = 0;
+$('#deck').addEventListener('touchstart', e => { tx = e.touches[0].clientX; ty = e.touches[0].clientY; }, { passive: true });
+$('#deck').addEventListener('touchend', e => { const dx = e.changedTouches[0].clientX - tx, dy = e.changedTouches[0].clientY - ty; if (Math.abs(dx) > 60 && Math.abs(dy) < 50){ if (dx < 0) next(); else prev(); } }, { passive: true });
+
+function onTheme(){ readColors(); startLoop(); }
+const mq = window.matchMedia('(prefers-color-scheme: dark)');
+if (mq.addEventListener) mq.addEventListener('change', onTheme);
+new MutationObserver(onTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+/* =========================================================
+   Slide controllers
+   ========================================================= */
+
+/* 1 · cover */
+CTL.cover = s => {
+  const st = Stage($('.cover-stage', s), kickFor(s)); let t0 = 0;
+  return {
+    enter(){ t0 = performance.now(); },
+    frame(ts){ const t = RM ? 0.9 : (ts - t0) / 1000 + 0.4; const ctx = st.ctx; ctx.clearRect(0, 0, st.w, st.h);
+      const sh = Math.max(76, st.h * .22); drawSlope(ctx, { x: 0, y: 0, w: st.w, h: st.h - sh }, t, { gauge: true }); drawStrip(ctx, { x: 0, y: st.h - sh, w: st.w, h: sh }, t, 4.8); return !RM; }
+  };
+};
+
+/* 2 · framework */
+CTL.frame = s => {
+  const cards = $$('.fw', s); let t0 = 0, last = -1;
+  return { enter(){ t0 = performance.now(); last = -1; },
+    frame(ts){ if (RM){ cards.forEach(c => c.classList.remove('on')); return false; } const k = Math.floor((ts - t0) / 1400) % (cards.length + 1); if (k !== last){ last = k; cards.forEach((c, i) => c.classList.toggle('on', i === k)); } return true; } };
+};
+
+/* 3 · sensors: data ticker */
+CTL.sensors = s => {
+  const pre = $('.ticker', s), svg = $('.board-svg', s), ledL = $('.js-led-l', s), ledR = $('.js-led-r', s); const n = noiseFn(21, 1, [1.3, 2.9, 6.1]); let t0 = 0, last = -1;
+  const f = (v, d, w) => v.toFixed(d).padStart(w || 6, ' ');
+  function render(t){
+    const rows = [];
+    for (let i = 0; i < 4; i++){ const tt = t - (3 - i) * 0.12; const side = (Math.round(tt / 0.12) % 2) ? 'R' : 'L'; const c = carve(tt);
+      rows.push('<b>' + (Math.max(0, tt)).toFixed(2).padStart(6, ' ') + 's ' + side + '</b>  acc' + f(n(tt) * 2, 1) + f(-9.6 + n(tt + 3), 1) + f(n(tt + 7) * 3, 1) +
+        '   gyr' + f(n(tt + 1) * 30, 0, 5) + f(n(tt + 5) * 20, 0, 5) + f(-c.yaw * 1.6, 0, 5) +
+        '   roll' + f(c.roll, 0, 5) + '°'); }
+    pre.innerHTML = rows.join('\n');
+    const now = (Math.round(t / 0.12) % 2) ? 'R' : 'L'; ledL.classList.toggle('hot', now === 'L'); ledR.classList.toggle('hot', now === 'R');
+  }
+  return { enter(){ t0 = performance.now(); last = -1; svg.classList.remove('go'); svg.getBoundingClientRect(); svg.classList.add('go'); render(12.36); },
+    frame(ts){ if (RM){ render(12.36); return false; } const t = 12.36 + (ts - t0) / 1000; const k = Math.floor(t / 0.12); if (k !== last){ last = k; render(k * 0.12); } return true; } };
+};
+
+/* 4 · journey */
+CTL.journey = s => {
+  const svgns = 'http://www.w3.org/2000/svg';
+  const g = $('.js-pk', s); const links = ['#lk1', '#lk2', '#lk3'].map(id => $(id, s));
+  const pk = []; links.forEach((lk, li) => { for (let j = 0; j < 3; j++){ const c = document.createElementNS(svgns, 'circle'); c.setAttribute('r', '5'); c.setAttribute('class', 'pk' + (li === 2 ? ' res' : '')); g.appendChild(c); pk.push({ c: c, li: li, off: j / 3 }); } });
+  const alt = $('#altPath', s), dotm = $('.js-dot', s), fire = $('.js-fire', s), cloud = $('.js-cloud', s);
+  const L = alt.getTotalLength(); let t0 = 0, firedAt = -10, stepN = 0;
+  function seg(lk){ const d = lk.getAttribute('d').match(/M(\d+),(\d+) H(\d+)/); return { x0: +d[1], y: +d[2], x1: +d[3] }; }
+  const segs = links.map(seg);
+  return {
+    enter(){ t0 = performance.now(); firedAt = -10; },
+    step(n){ stepN = n; },
+    frame(ts){
+      const t = RM ? 3 : (ts - t0) / 1000;
+      const loopT = 8, lt = t % loopT; const p = lt / loopT;
+      const pt = alt.getPointAtLength(p * L); dotm.setAttribute('cx', pt.x); dotm.setAttribute('cy', pt.y);
+      const firing = stepN >= 1 && pt.x > 560 && pt.x < 880;
+      if (firing && t - firedAt > loopT * .6) firedAt = t;
+      fire.classList.toggle('on', stepN >= 1 && t - firedAt < 2.6);
+      const resultOn = t - firedAt < 2.6 && stepN >= 1;
+      cloud.style.strokeWidth = resultOn ? '3' : '';
+      pk.forEach(o => { const sg = segs[o.li]; let u = (t * 0.55 + o.off) % 1; const show = o.li < 2 || resultOn || stepN < 1;
+        o.c.setAttribute('cx', sg.x0 + (sg.x1 - sg.x0) * u); o.c.setAttribute('cy', sg.y); o.c.setAttribute('opacity', show ? String(Math.sin(Math.PI * u)) : '0'); });
+      return !RM;
+    }
+  };
+};
+
+/* 6 · euler 3D */
+CTL.euler = s => {
+  const host = $('.euler-stage', s);
+  const rng_ = { r: $('#rngRoll', s), p: $('#rngPitch', s), y: $('#rngYaw', s) };
+  const out = { r: $('#outRoll', s), p: $('#outPitch', s), y: $('#outYaw', s) };
+  const cards = { r: $('.axcard.ar', s), p: $('.axcard.ap', s), y: $('.axcard.ay', s) };
+  const btns = $$('[data-demo]', s);
+  let mode = 'auto', t0 = performance.now(), ang = { r: 0, p: 0, y: 0 }, three = null, tv = -1;
+  function setMode(m){ mode = m; t0 = performance.now(); btns.forEach(b => b.setAttribute('aria-pressed', String(b.dataset.demo === m))); kickFor(s)(); }
+  btns.forEach(b => b.addEventListener('click', () => setMode(b.dataset.demo)));
+  ['r', 'p', 'y'].forEach(k => rng_[k].addEventListener('input', () => { if (mode !== 'manual'){ mode = 'manual'; btns.forEach(b => b.setAttribute('aria-pressed', 'false')); } ang[k] = +rng_[k].value; kickFor(s)(); }));
+  try { if (window.THREE) three = build(); } catch (e) { console.error(e); three = null; }
+  if (!three){ const p = document.createElement('p'); p.className = 'fallback'; p.textContent = '3D 演示没有加载出来，可以用右侧滑块和说明来理解三个角。'; host.appendChild(p); }
+  function build(){
+    const T = window.THREE;
+    const renderer = new T.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2)); host.appendChild(renderer.domElement);
+    const scene = new T.Scene(); const cam = new T.PerspectiveCamera(34, 1, .1, 50);
+    scene.add(new T.HemisphereLight(0xffffff, 0x8899aa, .95)); const dl = new T.DirectionalLight(0xffffff, .75); dl.position.set(2, 4, 3); scene.add(dl);
+    const sh = new T.Shape(); sh.moveTo(-.64, -.128); sh.quadraticCurveTo(0, -.112, .64, -.128); sh.quadraticCurveTo(.8, -.128, .8, 0); sh.quadraticCurveTo(.8, .128, .64, .128); sh.quadraticCurveTo(0, .112, -.64, .128); sh.quadraticCurveTo(-.8, .128, -.8, 0); sh.quadraticCurveTo(-.8, -.128, -.64, -.128);
+    const geo = new T.ExtrudeGeometry(sh, { depth: .026, bevelEnabled: true, bevelThickness: .006, bevelSize: .006, bevelSegments: 2, curveSegments: 24 });
+    geo.rotateX(-Math.PI / 2); geo.translate(0, -.013, 0);
+    const M = { board: new T.MeshStandardMaterial({ roughness: .55, metalness: .05 }), bind: new T.MeshStandardMaterial({ roughness: .7 }), pod: new T.MeshStandardMaterial({ roughness: .4 }) };
+    const board = new T.Group(); board.add(new T.Mesh(geo, M.board));
+    [-.27, .27].forEach((x, i) => { const bd = new T.Mesh(new T.BoxGeometry(.11, .045, .2), M.bind); bd.position.set(x, .035, 0); bd.rotation.y = i ? -.25 : .25; board.add(bd); const pod = new T.Mesh(new T.BoxGeometry(.06, .028, .06), M.pod); pod.position.set(x, .072, 0); board.add(pod); });
+    function axis(dir, len, key){ const g = new T.Group(); const m = new T.MeshBasicMaterial(); M['ax' + key] = m; const cyl = new T.Mesh(new T.CylinderGeometry(.006, .006, len * 2, 8), m); const cone = new T.Mesh(new T.ConeGeometry(.024, .07, 12), m); cone.position.y = len; g.add(cyl); g.add(cone); if (dir === 'x') g.rotation.z = -Math.PI / 2; if (dir === 'z') g.rotation.x = Math.PI / 2; return g; }
+    board.add(axis('x', 1.02, 'r')); board.add(axis('z', .5, 'p')); board.add(axis('y', .55, 'y'));
+    function arc(key, r){ const m = new T.MeshBasicMaterial({ transparent: true, opacity: 0 }); M['arc' + key] = m; return new T.Mesh(new T.TorusGeometry(r, .008, 8, 48, Math.PI * 1.4), m); }
+    const aR = arc('r', .2); aR.rotation.y = Math.PI / 2; aR.position.x = .9; board.add(aR);
+    const aP = arc('p', .18); aP.position.z = .42; board.add(aP);
+    const aY = arc('y', .24); aY.rotation.x = Math.PI / 2; aY.position.y = .45; board.add(aY);
+    scene.add(board);
+    const disc = new T.Mesh(new T.CircleGeometry(1.15, 64), new T.MeshBasicMaterial({ transparent: true, opacity: .55 })); disc.rotation.x = -Math.PI / 2; disc.position.y = -.42; scene.add(disc); M.disc = disc.material;
+    function colors(){ M.board.color.set(C.ink); M.bind.color.set(C.ink2); M.pod.color.set(C.panel); M.axr.color.set(C.roll); M.axp.color.set(C.pitch); M.axy.color.set(C.yaw); M.arcr.color.set(C.roll); M.arcp.color.set(C.pitch); M.arcy.color.set(C.yaw); M.disc.color.set(C.grid); }
+    function size(){ const r = host.getBoundingClientRect(); if (!r.width || !r.height) return; renderer.setSize(r.width, r.height, false); cam.aspect = r.width / r.height; const d = cam.aspect < 1 ? 3.6 / Math.max(.55, cam.aspect) : 3.4; cam.position.set(d * .56, d * .38, d * .66); cam.lookAt(0, -.02, 0); cam.updateProjectionMatrix(); }
+    if (window.ResizeObserver) new ResizeObserver(() => { size(); kickFor(s)(); }).observe(host);
+    size();
+    return { renderer: renderer, scene: scene, cam: cam, board: board, M: M, colors: colors, size: size };
+  }
+  function demoAngles(t){
+    const S = x => Math.sin(x);
+    if (mode === 'roll') return { r: 38 * S(t * 1.9), p: 0, y: 0, hot: 'r' };
+    if (mode === 'pitch') return { r: 0, p: 22 * S(t * 1.9), y: 0, hot: 'p' };
+    if (mode === 'yaw') return { r: 0, p: 0, y: 50 * S(t * 1.6), hot: 'y' };
+    if (mode === 'combo'){ const c = carve(t * .9); return { r: c.roll, p: 4 * S(t * 3.5), y: c.yaw * .9, hot: 'all' }; }
+    const cyc = 14, u = t % cyc;
+    if (u < 3.4) return { r: 38 * S(u / 3.4 * 2 * Math.PI), p: 0, y: 0, hot: 'r' };
+    if (u < 6.8) return { r: 0, p: 22 * S((u - 3.4) / 3.4 * 2 * Math.PI), y: 0, hot: 'p' };
+    if (u < 10.2) return { r: 0, p: 0, y: 50 * S((u - 6.8) / 3.4 * 2 * Math.PI), hot: 'y' };
+    const c = carve((u - 10.2) * .9); const env = Math.sin(Math.PI * (u - 10.2) / 3.8); return { r: c.roll * env, p: 0, y: c.yaw * .9 * env, hot: 'all' };
+  }
+  return {
+    enter(){ t0 = performance.now(); if (three) three.size(); },
+    frame(ts){
+      const t = RM ? 1.1 : (ts - t0) / 1000; let hot = null;
+      if (mode !== 'manual'){ const a = demoAngles(t); ang = { r: a.r, p: a.p, y: a.y }; hot = a.hot; rng_.r.value = Math.round(a.r); rng_.p.value = Math.round(a.p); rng_.y.value = Math.round(a.y); }
+      out.r.textContent = (ang.r >= 0 ? '+' : '') + Math.round(ang.r) + '°'; out.p.textContent = (ang.p >= 0 ? '+' : '') + Math.round(ang.p) + '°'; out.y.textContent = (ang.y >= 0 ? '+' : '') + Math.round(ang.y) + '°';
+      ['r', 'p', 'y'].forEach(k => cards[k].classList.toggle('hot', hot === k || hot === 'all'));
+      if (three){ if (tv !== THEMEV){ three.colors(); tv = THEMEV; }
+        const D = Math.PI / 180; three.board.rotation.set(ang.r * D, ang.y * D, ang.p * D, 'YZX');
+        const M = three.M; M.arcr.opacity = hot === 'r' ? 1 : hot === 'all' ? .45 : 0; M.arcp.opacity = hot === 'p' ? 1 : hot === 'all' ? .25 : 0; M.arcy.opacity = hot === 'y' ? 1 : hot === 'all' ? .45 : 0;
+        three.renderer.render(three.scene, three.cam); }
+      return !RM && mode !== 'manual';
+    }
+  };
+};
+
+/* 7 · sync */
+CTL.sync = s => {
+  const top = Stage($('.sync-top', s), kickFor(s)), ch = Stage($('.sync-chart', s), kickFor(s));
+  const bp = $('.js-play', s), bs = $('.js-slow', s);
+  let t = 0, last = 0, playing = true, speed = 1, stepAt = {};
+  bp.addEventListener('click', () => { playing = !playing; bp.textContent = playing ? '暂停' : '播放'; bp.setAttribute('aria-pressed', String(!playing)); last = 0; kickFor(s)(); });
+  bs.addEventListener('click', () => { speed = speed === 1 ? .4 : 1; bs.setAttribute('aria-pressed', String(speed !== 1)); });
+  function chart(now){
+    const ctx = ch.ctx, w = ch.w, h = ch.h; ctx.clearRect(0, 0, w, h); const fs = fsFor(w);
+    const b = { x: 46, y: 40, w: w - 62, h: h - 76 }; const P = CARVE.P, T = 2 * P; const tc = RM ? T : ((t % T) + T) % T;
+    const X = q => b.x + b.w * q / T; const Y = plotFrame(ctx, b, -70, 70, { ticks: [-60, -30, 0, 30, 60], unit: '°', fs: fs - 1 });
+    const a = k => stepAt[k] == null ? 0 : (RM ? 1 : clamp01((now - stepAt[k]) / 450));
+    if (a(4)){ const t1 = P / 2, t2 = P, f = [0, .369, .631, 1]; const nm = ['入弯', '弯中', '出弯'], sub = ['发起', '控制', '完成'];
+      for (let i = 0; i < 3; i++){ const x0 = X(t1 + (t2 - t1) * f[i]), x1 = X(t1 + (t2 - t1) * f[i + 1]); ctx.fillStyle = alpha(i === 1 ? C.roll : C.yaw, (i === 1 ? .13 : .08) * a(4)); ctx.fillRect(x0, b.y, x1 - x0, b.h); ctx.globalAlpha = a(4); label(ctx, nm[i], (x0 + x1) / 2, b.y + b.h - 28, C.ink, { align: 'center', fs: fs }); label(ctx, sub[i], (x0 + x1) / 2, b.y + b.h - 11, C.ink3, { align: 'center', fs: fs - 2, weight: 500 }); ctx.globalAlpha = 1; } }
+    if (a(1)){ ctx.save(); ctx.globalAlpha = a(1); ctx.setLineDash([4, 4]); ctx.strokeStyle = C.ink3; ctx.lineWidth = 1; for (let k = 0; k <= 4; k++){ const x = X(k * P / 2); ctx.beginPath(); ctx.moveTo(x, b.y - 8); ctx.lineTo(x, b.y + b.h); ctx.stroke(); } ctx.setLineDash([]);
+      for (let k = 0; k < 4; k++) label(ctx, '弯 ' + (k + 1), X(k * P / 2 + P / 4), b.y - 18, C.ink2, { align: 'center', fs: fs }); ctx.restore(); }
+    const N = 400, R = [], W = []; for (let i = 0; i <= N; i++){ const q = T * i / N; const c = carve(q); R.push([X(q), Y(c.roll)]); W.push([X(q), Y(c.yaw)]); }
+    line(ctx, W, alpha(C.yaw, .17), 2); line(ctx, R, alpha(C.roll, .17), 2);
+    const n = Math.round(N * tc / T); line(ctx, W.slice(0, n + 1), C.yaw, 2.6); line(ctx, R.slice(0, n + 1), C.roll, 2.6);
+    if (!RM){ ctx.strokeStyle = alpha(C.ink, .45); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(X(tc), b.y); ctx.lineTo(X(tc), b.y + b.h); ctx.stroke(); }
+    if (a(1)){ ctx.globalAlpha = a(1); for (let k = 0; k <= 4; k++){ const q = k * P / 2; dot(ctx, X(q), Y(carve(q).yaw), 5, C.yaw); }
+      label(ctx, 'Yaw 波峰 / 波谷 = 弯与弯的分界', X(P) + 12, Y(64), C['yaw-ink'], { fs: fs, bg: alpha(C.panel, .92) }); ctx.globalAlpha = 1; }
+    if (a(2)){ ctx.globalAlpha = a(2); for (let k = 0; k <= 4; k++) ring(ctx, X(k * P / 2), Y(0), 7, C.roll, 2.4);
+      label(ctx, 'Roll 过零 = 换刃', X(P / 2) + 12, Y(16), C['roll-ink'], { fs: fs, bg: alpha(C.panel, .92) }); ctx.globalAlpha = 1; }
+    if (a(3)){ ctx.globalAlpha = a(3); for (let k = 0; k < 4; k++){ const q = P / 4 + k * P / 2; const c = carve(q); dot(ctx, X(q), Y(c.roll), 5, C.roll); label(ctx, Math.abs(c.roll).toFixed(0) + '°', X(q), Y(c.roll) + (c.roll > 0 ? -16 : 16), C['roll-ink'], { align: 'center', fs: fs, mono: true }); }
+      label(ctx, 'Roll 峰值 = 弯中立刃最深', X(3 * P / 4) + 22, Y(-40) + 34, C['roll-ink'], { fs: fs, bg: alpha(C.panel, .92) }); ctx.globalAlpha = 1; }
+  }
+  return {
+    enter(){ t = 0; last = 0; },
+    step(n){ const now = performance.now(); for (let k = 1; k <= 4; k++){ if (k <= n){ if (stepAt[k] == null) stepAt[k] = now; } else delete stepAt[k]; } },
+    frame(ts){ if (!last) last = ts; const dt = Math.min(.05, (ts - last) / 1000); last = ts; if (playing && !RM) t += dt * speed;
+      const ctx = top.ctx; ctx.clearRect(0, 0, top.w, top.h); drawSlope(ctx, { x: 0, y: 0, w: top.w, h: top.h }, RM ? 0.9 : t, { gauge: true }); chart(ts);
+      const fading = Object.keys(stepAt).some(k => ts - stepAt[k] < 500); return !RM && (playing || fading); }
+  };
+};
+
+/* 8 · patterns */
+const PATS = (function(){
+  const n1 = noiseFn(31, 1, [6.1, 9.7, 14.3]), n2 = noiseFn(37, 1, [4.3, 7.9, 12.1]), n3 = noiseFn(41, 1, [.9, 1.7, 3.3]);
+  const S = (t, P) => Math.sin(2 * Math.PI * t / P), Co = (t, P) => Math.cos(2 * Math.PI * t / P);
+  return [
+    { roll: t => 36 * S(t, 2.6) + n1(t) * 1.4, yaw: t => 46 * Co(t, 2.6) + n2(t) },
+    { roll: t => 13 * Math.tanh(2.4 * S(t, 2.2)) + n1(t) * 2.2, yaw: t => 52 * Math.tanh(3.4 * Co(t, 2.2)) + n2(t) * 1.5 },
+    { roll: t => 16 + 4 * S(t, 3.3) + n1(t) * 2, yaw: t => 34 + 9 * S(t, 4.6) + n3(t) * 3, note: 'Roll 始终在零线一侧' },
+    { roll: t => { const k = t < 3.6 ? 1 : t > 6.6 ? 1 : 0; const sm = t < 3.6 ? clamp01((3.6 - t) / .5) : t > 6.6 ? clamp01((t - 6.6) / .5) : 0; return 30 * S(t, 2.4) * sm + n1(t) * (k ? 1.2 : .6); },
+      yaw: t => { const sm = t < 3.6 ? clamp01((3.6 - t) / .5) : t > 6.6 ? clamp01((t - 6.6) / .5) : 0; return 40 * Co(t, 2.4) * sm + 12 * (1 - sm) + n2(t) * .8; }, flat: [3.6, 6.6] }
+  ];
+})();
+CTL.patterns = s => {
+  const sts = $$('.pat .stage', s).map(el => Stage(el, kickFor(s))); let t0 = 0;
+  function draw(st, i, p){
+    const ctx = st.ctx, w = st.w, h = st.h; ctx.clearRect(0, 0, w, h); const fs = fsFor(w * 1.3);
+    const b = { x: 40, y: 12, w: w - 50, h: h - 24 }; const X = q => b.x + b.w * q / 10; const Y = plotFrame(ctx, b, -70, 70, { ticks: [-45, 0, 45], unit: '', fs: fs - 2 });
+    const pat = PATS[i];
+    if (pat.flat && p >= 1){ ctx.fillStyle = alpha(C.ink3, .12); ctx.fillRect(X(pat.flat[0]), b.y, X(pat.flat[1]) - X(pat.flat[0]), b.h); label(ctx, '停顿', (X(pat.flat[0]) + X(pat.flat[1])) / 2, b.y + 14, C.ink2, { align: 'center', fs: fs }); }
+    const N = 260, R = [], W = []; const end = Math.round(N * p);
+    for (let k = 0; k <= end; k++){ const q = 10 * k / N; R.push([X(q), Y(pat.roll(q))]); W.push([X(q), Y(pat.yaw(q))]); }
+    line(ctx, W, C.yaw, 2); line(ctx, R, C.roll, 2.2);
+    if (pat.note && p >= 1) label(ctx, pat.note, b.x + b.w - 6, Y(0) + 14, C['roll-ink'], { align: 'right', fs: fs, bg: alpha(C.panel, .9) });
+  }
+  return { enter(){ t0 = performance.now(); }, frame(ts){ const p = RM ? 1 : clamp01((ts - t0) / 2200); sts.forEach((st, i) => draw(st, i, ease(p))); return p < 1; } };
+};
+
+/* 10 · hierarchy ticks/cells (static) */
+(function(){ const ns = 'http://www.w3.org/2000/svg';
+  const g = document.getElementById('blkTicks'); if (g){ const xs = [290, 350, 405, 468, 530, 595, 740, 808, 876, 944, 1012, 1080, 1148]; xs.forEach(x => { const l = document.createElementNS(ns, 'line'); l.setAttribute('x1', x); l.setAttribute('x2', x); l.setAttribute('y1', 242); l.setAttribute('y2', 274); l.setAttribute('class', 'tk'); g.appendChild(l); }); }
+  const c = document.getElementById('cells'); if (c){ const n = 7, gap = 8, w = (960 - gap * (n - 1)) / n; for (let i = 0; i < n; i++){ const x = 230 + i * (w + gap); const r = document.createElementNS(ns, 'rect'); r.setAttribute('x', x.toFixed(1)); r.setAttribute('y', 344); r.setAttribute('width', w.toFixed(1)); r.setAttribute('height', 40); r.setAttribute('rx', 6); r.setAttribute('class', 'cell' + (i === 2 ? ' hot' : '')); c.appendChild(r);
+    const t = document.createElementNS(ns, 'text'); t.setAttribute('x', (x + w / 2).toFixed(1)); t.setAttribute('y', 369); t.setAttribute('text-anchor', 'middle'); t.setAttribute('class', i === 2 ? 'inw' : 'in'); t.textContent = '弯 ' + (i + 1); c.appendChild(t); } }
+})();
+
+/* 11 · segmentation */
+const DAY = (function(){
+  const ph = [['idle', 0, 3, 20, 20], ['lift', 3, 15, 20, 380], ['idle', 15, 17, 380, 378], ['ski', 17, 25, 378, 232], ['stop', 25, 27.5, 232, 230], ['ski', 27.5, 35, 230, 32], ['idle', 35, 39, 32, 26], ['lift', 39, 51, 26, 380], ['idle', 51, 52.5, 380, 378], ['ski', 52.5, 65, 378, 28], ['idle', 65, 69, 28, 24], ['lift', 69, 81, 24, 380], ['idle', 81, 82.5, 380, 378], ['ski', 82.5, 93, 378, 44], ['idle', 93, 100, 44, 40]];
+  const nA = noiseFn(3, 4, [2.1, 4.7, 9.3]), nP = noiseFn(5, 1, [1.3, 3.7, 8.1]); const t = [], alt = [], pr = [];
+  for (let i = 0; i <= 1000; i++){ const q = i / 10; const p = ph.find(z => q >= z[1] && q <= z[2]) || ph[ph.length - 1]; const u = (q - p[1]) / (p[2] - p[1]); let a = p[3] + (p[4] - p[3]) * u, v;
+    if (p[0] === 'ski'){ a += Math.sin(u * Math.PI * 9) * 5 + nA(q) * 1.2; v = .9 + nP(q) * .06; }
+    else if (p[0] === 'lift'){ a += nA(q) * .6; v = .07 + Math.max(0, nP(q)) * .14; }
+    else if (p[0] === 'stop'){ a += nA(q) * .5; v = .12 + nP(q) * .05; }
+    else { a += nA(q) * .8; v = .06 + Math.max(0, nP(q)) * .1; }
+    t.push(q); alt.push(a); pr.push(clamp01(v)); }
+  const sm = pr.map((v, i) => { let s = 0, n = 0; for (let k = -4; k <= 4; k++){ const j = i + k; if (j >= 0 && j < pr.length){ s += pr[j]; n++; } } return s / n; });
+  return { t: t, alt: alt, pr: sm, segs: [[17, 25], [27.5, 35], [52.5, 65], [82.5, 93]], runs: [[17, 35], [52.5, 65], [82.5, 93]], lifts: [[3, 15], [39, 51], [69, 81]] };
+})();
+CTL.segment = s => {
+  const st = Stage($('.stage', s), kickFor(s)); let t0 = 0, stepAt = {};
+  function draw(now){
+    const ctx = st.ctx, w = st.w, h = st.h; ctx.clearRect(0, 0, w, h); const fs = fsFor(w);
+    const top = { x: 44, y: 46, w: w - 58, h: (h - 46) * .6 }, bot = { x: 44, y: top.y + top.h + 30, w: w - 58, h: (h - 46) * .4 - 52 };
+    const X = q => top.x + top.w * q / 100; const Ya = plotFrame(ctx, top, 0, 420, { ticks: [0, 200, 400], unit: 'm', fs: fs - 2 });
+    const a = k => stepAt[k] == null ? 0 : (RM ? 1 : clamp01((now - stepAt[k]) / 500));
+    if (a(2)){ DAY.segs.forEach((sg, i) => { ctx.fillStyle = alpha(C.roll, .16 * a(2)); ctx.fillRect(X(sg[0]), top.y, X(sg[1]) - X(sg[0]), top.h); ctx.globalAlpha = a(2); label(ctx, '段 ' + (i + 1), (X(sg[0]) + X(sg[1])) / 2, top.y + top.h - 12, C['roll-ink'], { align: 'center', fs: fs - 1, weight: 700 }); ctx.globalAlpha = 1; });
+      ctx.globalAlpha = a(2); label(ctx, '← 停下 → 断开', X(27.8), Ya(285), C.ink, { fs: fs - 1, bg: alpha(C.panel, .95) }); ctx.globalAlpha = 1; }
+    const p = RM ? 1 : clamp01((now - t0) / 1600); const n = Math.round(1000 * ease(p)); const pts = []; for (let i = 0; i <= n; i++) pts.push([X(DAY.t[i]), Ya(DAY.alt[i])]); line(ctx, pts, C.ink, 2);
+    if (p >= 1) DAY.lifts.forEach(l => label(ctx, '缆车 ↗', X((l[0] + l[1]) / 2), Ya(60), C.ink3, { align: 'center', fs: fs - 1 }));
+    label(ctx, '高度（气压计）', top.x + 4, top.y - 22, C.ink2, { fs: fs - 1 });
+    label(ctx, '09:30', top.x, h - 10, C.ink3, { fs: fs - 2, mono: true }); label(ctx, '12:00', top.x + top.w, h - 10, C.ink3, { fs: fs - 2, mono: true, align: 'right' });
+    if (a(1)){ ctx.globalAlpha = a(1); const Yp = v => bot.y + bot.h * (1 - v); ctx.strokeStyle = C.grid; ctx.beginPath(); ctx.moveTo(bot.x, Yp(0) + .5); ctx.lineTo(bot.x + bot.w, Yp(0) + .5); ctx.moveTo(bot.x, Yp(1) + .5); ctx.lineTo(bot.x + bot.w, Yp(1) + .5); ctx.stroke();
+      const m = Math.round(1000 * clamp01((now - stepAt[1]) / 900 + (RM ? 1 : 0))); ctx.beginPath(); ctx.moveTo(X(0), Yp(0)); for (let i = 0; i <= m; i++) ctx.lineTo(X(DAY.t[i]), Yp(DAY.pr[i])); ctx.lineTo(X(DAY.t[m]), Yp(0)); ctx.closePath(); ctx.fillStyle = alpha(C.ink, .14); ctx.fill();
+      const lp = []; for (let i = 0; i <= m; i++) lp.push([X(DAY.t[i]), Yp(DAY.pr[i])]); line(ctx, lp, C.ink2, 1.6);
+      label(ctx, '是不是在滑（根据动作判断）', bot.x + 4, bot.y - 12, C.ink2, { fs: fs - 1 }); ctx.globalAlpha = 1; }
+    if (a(3)){ ctx.globalAlpha = a(3); DAY.runs.forEach((r, i) => { const x0 = X(r[0]), x1 = X(r[1]), y = top.y - 6; ctx.strokeStyle = C['roll-ink']; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x0, y + 6); ctx.lineTo(x0, y); ctx.lineTo(x1, y); ctx.lineTo(x1, y + 6); ctx.stroke(); label(ctx, 'Run ' + (i + 1), (x0 + x1) / 2, y - 12, C['roll-ink'], { align: 'center', fs: fs, weight: 800, bg: alpha(C.panel, .95) }); });
+      label(ctx, '高度回升 = 坐了缆车 → 新的一趟', X(48.5), Ya(395), C.ink, { align: 'right', fs: fs - 1, bg: alpha(C.panel, .95) }); ctx.globalAlpha = 1; }
+  }
+  return { enter(){ t0 = performance.now(); },
+    step(n){ const now = performance.now(); for (let k = 1; k <= 3; k++){ if (k <= n){ if (stepAt[k] == null) stepAt[k] = now; } else delete stepAt[k]; } },
+    frame(ts){ draw(ts); return !RM && (ts - t0 < 1700 || Object.keys(stepAt).some(k => ts - stepAt[k] < 1000)); } };
+};
+
+/* 19 · issues sparklines */
+CTL.issues = s => {
+  const sts = $$('.icard .stage', s).map(el => Stage(el, kickFor(s))); let t0 = 0;
+  const nz = noiseFn(91, 1, [17.1, 23.3, 31.7]);
+  const F = [
+    q => ({ y: 40 * Math.cos(Math.PI * q / .5), r: -36 * Math.sin(Math.PI * (q - .12) / .5), mark: [.5, .62] }),
+    q => ({ y: q < .45 ? 40 - q * 10 : 35.5 - 75 * (1 - Math.cos(Math.PI * clamp01((q - .45) / .3))) / 2, r: q < .45 ? 5 : -38 * Math.sin(Math.PI * clamp01((q - .45) / .4)) }),
+    q => { const g = q > .4 && q < .62; return { y: g ? -40 : q < .4 ? 40 * Math.cos(Math.PI * q / .4) : -40 * Math.cos(Math.PI * (q - .62) / .38), r: g ? 0 : q < .4 ? 36 * Math.sin(Math.PI * q / .4) : -36 * Math.sin(Math.PI * (q - .62) / .38) }; },
+    q => ({ y: 40 * Math.cos(Math.PI * q / .5), r: (q < .5 ? 1 : -1) * Math.abs(Math.sin(Math.PI * q / .5)) * (24 + 14 * Math.sin(2 * Math.PI * q * 4)) }),
+    q => ({ y: 40 * Math.cos(Math.PI * q / .5), r: 34 * Math.sin(Math.PI * q / .5) + 8 * nz(q * 6) * Math.abs(Math.sin(Math.PI * q / .5)) }),
+    q => ({ y: q < .7 ? 40 - 30 * q : 19 - 60 * clamp01((q - .7) / .08), r: 12 * Math.sin(Math.PI * q / .7) * (q < .7 ? 1 : 0) })
+  ];
+  function draw(st, i, p){
+    const ctx = st.ctx, w = st.w, h = st.h; ctx.clearRect(0, 0, w, h);
+    const b = { x: 2, y: 6, w: w - 4, h: h - 12 }; const X = q => b.x + b.w * q; const Y = v => b.y + b.h * (1 - (v + 55) / 110);
+    ctx.strokeStyle = alpha(C.ink3, .45); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(b.x, Y(0)); ctx.lineTo(b.x + b.w, Y(0)); ctx.stroke();
+    const N = 160, R = [], W = []; const end = Math.round(N * p);
+    for (let k = 0; k <= end; k++){ const q = k / N; const v = F[i](q); W.push([X(q), Y(v.y)]); R.push([X(q), Y(v.r)]); }
+    line(ctx, W, C.yaw, 1.8); line(ctx, R, C.roll, 2);
+    const m = F[i](0).mark; if (m && p >= 1){ ctx.strokeStyle = C['roll-ink']; ctx.lineWidth = 1.5; const y = b.y + 6; ctx.beginPath(); ctx.moveTo(X(m[0]), y); ctx.lineTo(X(m[1]), y); ctx.stroke(); label(ctx, '晚了', (X(m[0]) + X(m[1])) / 2, y + 11, C['roll-ink'], { align: 'center', fs: 11 }); }
+  }
+  return { enter(){ t0 = performance.now(); }, frame(ts){ const p = RM ? 1 : clamp01((ts - t0) / 1500); sts.forEach((st, i) => draw(st, i, ease(p))); return p < 1; } };
+};
+
+/* 14 · analysis loop */
+CTL.loop = s => {
+  const cards = $$('.lp', s); let t0 = 0, last = -1, n = 0;
+  return { enter(){ t0 = performance.now(); last = -1; }, step(k){ n = k; },
+    frame(ts){ if (RM) return false; const vis = Math.min(cards.length, n + 1); const k = Math.floor((ts - t0) / 1300) % (vis + 1); if (k !== last){ last = k; cards.forEach((c, i) => c.style.borderColor = i === k ? 'var(--roll)' : ''); } return true; } };
+};
+
+/* 20 · recap */
+CTL.recap = s => {
+  const nodes = $$('.nodes span', s); let t0 = 0, last = -1;
+  return { enter(){ t0 = performance.now(); last = -1; nodes.forEach(n => n.classList.remove('on')); },
+    frame(ts){ if (RM) return false; const k = Math.floor((ts - t0) / 520) % (nodes.length + 4); if (k !== last){ last = k; nodes.forEach((n, i) => n.classList.toggle('on', i === k)); } return true; } };
+};
+
+/* ---------- boot ---------- */
+slides.forEach(s => s.setAttribute('aria-hidden', 'true'));
+const m = /^#p(\d+)$/.exec(location.hash || '');
+go(m ? Math.max(0, Math.min(slides.length - 1, +m[1] - 1)) : 0, 0, true);
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => startLoop());
+})();
+</script>
+
+</body>
+</html>
