@@ -255,10 +255,10 @@ function actionPath(){return `<div class="action-path">${[['PHASE 01','Scope','S
 
 const lifecycleStages=[
 {name:'Raw materials supply',icon:'materials',share:33,color:'#214f83',action:'Choose materials. Design out waste.',detail:'Machine parts and packaging: material extraction and processing, including packaging materials. Reduce material use, choose recycled content and lower-impact materials.',evidence:'Material grades · part weights · packaging composition · supplier records'},
-{name:'Production',icon:'factory',share:10,color:'#487cb6',action:'Build efficiently.',detail:'Component production and final assembly. Reduce process energy, scrap and production waste.',evidence:'Production energy · scrap rates · assembly data'},
-{name:'Transport',icon:'truck',share:2,color:'#8daece',action:'Optimise the journey',detail:'Assess shipping distances, transport modes and load efficiency from the factory to the user.',evidence:'Shipping routes · transport modes · load factors'},
+{name:'Production',icon:'factory',share:8,color:'#487cb6',action:'Build efficiently.',detail:'Component production and final assembly. Reduce process energy, scrap and production waste.',evidence:'Production energy · scrap rates · assembly data'},
+{name:'Transport',icon:'truck',share:3,color:'#8daece',action:'Optimise the journey',detail:'Assess shipping distances, transport modes and load efficiency from the factory to the user.',evidence:'Shipping routes · transport modes · load factors'},
 {name:'Use and maintenance',icon:'coffee',share:50,color:'#12335b',action:'Design for efficiency and longevity',detail:'Improve brewing, standby and cleaning efficiency. Extend service life through maintenance and repair; coffee ingredients are excluded.',evidence:'Use profile · energy consumption · maintenance · lifetime assumptions'},
-{name:'End of life',icon:'cycle',share:5,color:'#4d967b',action:'Plan recovery and treatment',detail:'Enable disassembly and material recovery. Account for collection, recycling and disposal under a stated end-of-life scenario.',evidence:'Collection rates · recycling routes · waste treatment assumptions'}
+{name:'End of life',icon:'cycle',share:6,color:'#4d967b',action:'Plan recovery and treatment',detail:'Enable disassembly and material recovery. Account for collection, recycling and disposal under a stated end-of-life scenario.',evidence:'Collection rates · recycling routes · waste treatment assumptions'}
 ];
 function lifecycleSplitText(){return lifecycleStages.map(s=>`${s.name}: ${s.share}%`).join('; ');}
 
